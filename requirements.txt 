@@ -1,0 +1,10 @@
+# Google Cloud APIs
+google-cloud-speech
+google-cloud-texttospeech
+google-generativeai
+
+# Audio handling for laptop prototype
+sounddevice
+
+# Hardware-specific for Raspberry Pi (Phase 2)
+# RPi.GPIO
