@@ -241,13 +241,18 @@ You **MUST** adhere to the following file naming and location conventions for al
 
 This project uses a two-tiered logging system. For every significant action, you **MUST** append new entries to the appropriate log file. **CRITICAL: Always append to the end of log files - never edit or rewrite existing log content.**
 
-**LOGGING FREQUENCY**: You must log continuously throughout project work, including:
+**LOGGING FREQUENCY**: You must log using a batched milestone approach:
 
-- Complete conversation cycles (your prompts + user responses + your follow-ups)
-- Full transcripts for every user interaction
+**Immediate Logging (buildlog.log):**
+
 - All mode switches, code proposals, and verification results
 - All significant development activities and decisions
-- Questions you ask users and their responses as complete dialogue cycles
+
+**Batched Logging (buildlog_verbose.log) - Write at these triggers:**
+
+- Right before any code commit (in Commit Mode)
+- At the start of responding to any user prompt
+- Batch should include: Complete conversation cycles, full transcripts, questions/responses, dialogue cycles from the session
 
 1.  **`docs/logs/buildlog.log` (Milestone Log)**: This file captures high-level project progress. You must append the following events here:
     - `[MODE_SWITCH]`
@@ -283,27 +288,26 @@ This project uses a two-tiered logging system. For every significant action, you
 
 **CRITICAL: All logging must happen CONTINUOUSLY throughout project work. Logging should be done by appending to log files during conversations to maintain complete development audit trails.**
 
-**IMPLEMENTATION NOTE: Logging is implemented using terminal commands for optimal performance. Use `echo >>` for milestone events and `cat >> file << 'EOF'` heredoc syntax for verbose transcripts. Terminal commands provide instant append operations regardless of log file size, avoiding the performance bottleneck of reading entire files.**
+**IMPLEMENTATION NOTE: Logging uses a batched milestone approach - milestone events are logged immediately to buildlog.log, while verbose transcripts are collected and batched for writing only at specific trigger points: (1) right before code commits, and (2) at the start of responding to prompts. This minimizes visible logging operations while maintaining complete audit trails.**
 
 **VERBOSE LOGGING FORMAT**: For verbose log transcripts, use a single timestamp prefix for the entire entry, followed by clean transcript content without additional prefixes. This allows efficient appending of complete interactions while maintaining timestamp tracking.
 
-**LOGGING COMMANDS:**
+**LOGGING IMPLEMENTATION:**
 
 ```bash
-# Milestone logging (buildlog.log):
-echo "YYYY-MM-DD HH:MM:SS - username - emoji - [EVENT] - description" >> docs/logs/buildlog.log
+# Milestone logging (buildlog.log) - Immediate:
+Use edit_file to manually append: "YYYY-MM-DD HH:MM:SS - username - emoji - [EVENT] - description"
 
-# Verbose logging (buildlog_verbose.log):
-cat >> docs/logs/buildlog_verbose.log << 'EOF'
-YYYY-MM-DD HH:MM:SS - username - emoji - [TRANSCRIPT] - description
----
-### USER PROMPT:
-[user's complete prompt]
+# Verbose logging (buildlog_verbose.log) - Batched at milestones:
+Collect conversations mentally, then write batches only at:
+- Start of responding to prompts
+- Right before code commits
 
-### CURSOR RESPONSE:
-[your complete response]
+Batch format:
+YYYY-MM-DD HH:MM:SS - username - emoji - [TRANSCRIPT_BATCH] - Session conversations
 ---
-EOF
+[Multiple conversation cycles from the session]
+---
 ```
 
 - **Event Formats**:
