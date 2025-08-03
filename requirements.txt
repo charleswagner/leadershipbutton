@@ -1,0 +1,25 @@
+# Audio handling dependencies
+pyaudio>=0.2.11
+
+# Google Cloud API dependencies
+google-cloud-speech>=2.0.0
+google-cloud-texttospeech>=2.0.0
+google-auth>=2.0.0
+
+# Configuration and environment management
+python-dotenv>=1.0.0
+
+# Retry logic and reliability
+tenacity>=8.0.0
+
+# Development and testing
+pytest>=7.0.0
+pytest-cov>=4.0.0
+
+# Raspberry Pi GPIO (optional - only needed on Pi)
+# RPi.GPIO>=0.7.1
+
+# Logging and utilities
+coloredlogs>=15.0
+
+pynput

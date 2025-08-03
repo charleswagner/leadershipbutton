@@ -1,0 +1,19 @@
+{
+  "api_settings": {
+    "log_level": "WARNING",
+    "enable_logging": true
+  },
+  "development": {
+    "mock_api_calls": false,
+    "save_debug_audio": false,
+    "verbose_logging": false,
+    "simulate_network_delays": false
+  },
+  "performance": {
+    "cache_tts_responses": true,
+    "max_audio_buffer_mb": 50
+  },
+  "features": {
+    "enable_audio_preprocessing": true
+  }
+}

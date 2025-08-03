@@ -1,0 +1,15 @@
+{
+  "api_settings": {
+    "log_level": "DEBUG",
+    "enable_logging": true
+  },
+  "development": {
+    "mock_api_calls": false,
+    "save_debug_audio": true,
+    "verbose_logging": true,
+    "simulate_network_delays": false
+  },
+  "performance": {
+    "cache_tts_responses": false
+  }
+}
