@@ -45,3 +45,46 @@
 2024-08-03 01:35:00 - 🎁 - [MODE_SWITCH] - Switched to Commit Mode
 2024-08-03 01:40:00 - ▶️ - [GIT_COMMIT_PROPOSAL] - Roadmap restructuring and conversational features: Restructured roadmaps with Phase 2 as AI Integration and Phase 3 as Hardware. Added comprehensive conversational features including Firestore integration, 10-minute conversation windows, multi-user support, personalized greetings, follow-up questions, and comprehensive logging. Created detailed ConversationManager specification with security, privacy, and performance considerations. Enhanced user experience journey and architecture overview.
 2024-12-19 15:30:00 - ▶️ - [GIT_COMMIT_PROPOSAL] - Preparing commit after comprehensive README updates and roadmap reorganization. Updated README.md with complete API documentation, CLI reference, troubleshooting guide, and all available software ecosystem details. Updated README.txt to match README.md content with console-appropriate formatting. Reorganized technical and product roadmaps to move input system abstraction from Phase 2.5 into Phase 3, consolidating hardware integration tasks. Both README files now provide identical comprehensive documentation with semantic equivalence.
+2024-12-19 16:45:00 - 🎁 - [MODE_SWITCH] - Switched to Commit Mode
+2024-12-19 16:50:00 - 🤖 - [MODE_SWITCH] - Switched to Autonomous Mode
+2024-12-19 16:52:00 - 🤖🎨 - [AUTONOMOUS_DESIGN] - Executing: Research Gemini Pro vs Gemini Flash for leadership coaching
+2024-12-19 16:55:00 - 🏛️ - [DESIGN_PROPOSED] - **Decision: Gemini Flash Selected for Leadership Coaching Application**
+
+**Rationale:** Gemini Flash chosen for superior responsiveness in conversational context, which is critical for our voice-first leadership coaching experience. Key benefits:
+
+- **Low Latency**: Optimized for real-time conversation flow
+- **Cost Efficiency**: $0.15/$0.60 per million tokens vs Pro's $1.25/$10.00
+- **Controllable Reasoning**: Dynamic quality/speed/cost balance via "thinking budget"
+- **MoE Architecture**: Efficient processing for conversational workloads
+- **1M Token Context**: Sufficient for extended coaching sessions
+- **Future Flexibility**: Can upgrade to Pro later for more complex scenarios
+
+This supports our goal of natural, responsive leadership coaching conversations while maintaining cost-effectiveness for Phase 2 AI integration.
+2024-12-19 16:58:00 - 🤖📐 - [AUTONOMOUS_SPEC] - Executing: Implement Gemini Flash client with authentication
+2024-12-19 17:00:00 - 💬 - [PLAN_ITERATION] - User requested enhanced autonomous mode protocol for better bootstrapping and foundation verification
+2024-12-19 21:22:15 - 🤖 - [MODE_SWITCH] - Switched to Autonomous Mode
+2024-12-19 21:22:30 - 🤖🏛️ - [AUTONOMOUS_ARCH] - Architecture check failed: docs/plans/architecture.md does not exist
+2024-12-19 21:22:30 - 🏛️ - [MODE_SWITCH] - Switched to Architecture Mode
+2024-12-19 21:23:15 - 🏛️ - [ARCHITECTURE_DISCUSSION] - User provided architectural direction: Gemini-optimized, cloud-first, RPi hardware, personal/family use, multi-user ready
+2024-12-19 21:24:00 - 🏛️ - [ARCHITECTURE_PRINCIPLES_APPROVED] - Seven core architectural principles approved, proceeding to detailed design
+2024-12-19 21:25:30 - ⚠️ - [MISSING_FOUNDATION] - docs/project_conventions.md missing - required as source of truth before architecture completion
+2024-12-30 11:51:23 - 🎨 - [MODE_SWITCH] - Switched to Design Mode
+2025-01-03 11:45:22 - 🚦 - [MODE_SWITCH] - Switched to Initialization Mode
+2025-01-03 11:45:25 - 🏛️ - [MODE_SWITCH] - Switched to Architecture Mode
+2025-01-03 11:45:30 - 🍄 - [MODE_SWITCH] - Switched to Vibe Mode
+2025-01-03 12:00:00 - cwagner - 🎁 - [MODE_SWITCH] - Switched to Commit Mode
+2025-01-03 12:01:00 - cwagner - 🍄 - [MODE_SWITCH] - Switched to Vibe Mode
+2025-01-03 12:03:00 - cwagner - 🍄 - [CODE_PROPOSED] - Updated logging protocol to stop manual file editing during conversations - logging now conceptual only
+2025-01-03 12:15:00 - cwagner - 🍄 - [CODE_PROPOSED] - Updated spec-driven prompt to restore continuous logging with simplified verbose format
+2025-01-03 12:20:00 - cwagner - 🍄 - [PERFORMANCE_ANALYSIS] - Identified verbose logging bottleneck - edit_file reads entire log each time, performance degrades with file size
+2025-01-03 12:25:00 - cwagner - 🍄 - [PERFORMANCE_BREAKTHROUGH] - Terminal command logging identified as optimal solution - instant append regardless of file size
+2025-01-03 12:30:00 - cwagner - 🍄 - [CODE_PROPOSED] - Updated logging protocol to use terminal commands for optimal performance
+2025-08-03 17:03:02 - cwagner - 🚦 - [MODE_SWITCH] - Switched to Initialization Mode
+2025-08-03 17:03:03 - cwagner - 🎁 - [MODE_SWITCH] - Switched to Commit Mode
+2025-08-03 17:05:41 - cwagner - 🍄 - [MODE_SWITCH] - Switched to Vibe Mode
+2025-08-03 17:06:07 - cwagner - 🍄 - [CODE_PROPOSED] - Fixing verbose logging issues: date evaluation, complete transcript capture, and current timestamps
+2025-08-03 17:07:21 - cwagner - 🍄 - [VIBE_SUCCESS] - User confirmed verbose logging fix successful - all three issues resolved
+2025-08-03 17:08:30 - cwagner - 🚦 - [MODE_SWITCH] - Switched to Initialization Mode
+2025-08-03 17:08:49 - cwagner - 🎁 - [MODE_SWITCH] - Switched to Commit Mode
+2025-08-03 17:09:43 - cwagner - 🍄 - [MODE_SWITCH] - Switched to Vibe Mode
+2025-08-03 17:11:55 - cwagner - 🎁 - [MODE_SWITCH] - Switched to Commit Mode

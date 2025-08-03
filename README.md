@@ -12,8 +12,8 @@ Hold the spacebar, speak your leadership challenge, and receive immediate AI-pow
 ## 📑 Quick Links
 
 - **🚀 [Quick Start](#-quick-start)** - Get running in 5 minutes
-- **📋 [Spec-Driven Development](docs/settings/spec_driven_prompt.md)** - Development workflow and AI assistant configuration
-- **🛠️ [Bootstrap Guide](docs/settings/bootstrap_py.md)** - Complete development environment setup
+- **📋 [Spec-Driven Development](.specpilot/spec_driven_prompt.md)** - Development workflow and AI assistant configuration
+- **🛠️ [Bootstrap Guide](.specpilot/bootstrap_py.md)** - Complete development environment setup
 - **📊 [Technical Roadmap](docs/plans/technical_roadmap.md)** - Development phases and milestones
 - **🎯 [Product Roadmap](docs/plans/product_roadmap.md)** - Feature roadmap and vision
 
@@ -76,27 +76,7 @@ python3 src/main.py
 # • Release to process and hear the AI response
 ```
 
-<<<<<<< Updated upstream 4. **Configure the spec-driven workflow:**
-
-- Open `docs/settings/spec_driven_prompt.md`
-- Copy the entire contents
-- In Cursor, open your "Spec-Driven Python" custom mode
-- Paste the contents into the "Instructions" box
-
-5. **Start the application:**
-
-   ```bash
-   python src/main.py
-   ```
-
-6. **Use the application:**
-   - Hold the spacebar to record your leadership question
-   - Release to process and hear the AI response
-   - # Continue the conversation with follow-up questions
-
 ---
-
-> > > > > > > Stashed changes
 
 ## 📖 Project Overview
 
@@ -433,7 +413,7 @@ play_audio_and_wait(audio_data)
 
 ### Development Workflow
 
-This project uses **Spec-Driven Development**. See [docs/settings/spec_driven_prompt.md](docs/settings/spec_driven_prompt.md) for complete workflow setup.
+This project uses **Spec-Driven Development**. See [.specpilot/spec_driven_prompt.md](.specpilot/spec_driven_prompt.md) for complete workflow setup.
 
 #### Bootstrap Development Environment
 
@@ -441,7 +421,7 @@ This project uses **Spec-Driven Development**. See [docs/settings/spec_driven_pr
 
    ```bash
    # Copy spec-driven prompt to your AI assistant
-   cat docs/settings/spec_driven_prompt.md
+   cat .specpilot/spec_driven_prompt.md
    # Paste into Cursor "Spec-Driven Python" custom mode
    ```
 
@@ -554,9 +534,10 @@ leadershipbutton/
 │   ├── plans/                       # Project planning
 │   │   ├── technical_roadmap.md     # Technical milestones
 │   │   └── product_roadmap.md       # Product vision
-│   └── settings/                    # Development settings
-│       ├── spec_driven_prompt.md    # AI assistant configuration
-│       └── bootstrap_py.md          # Environment setup guide
+│   └── specs/                       # Feature specifications
+├── 📁 .specpilot/                   # AI development workflow
+│   ├── spec_driven_prompt.md        # AI assistant configuration
+│   └── bootstrap_py.md              # Environment setup guide
 ├── 📁 tests/                        # Test suite
 │   ├── test_api_client.py           # API client tests
 │   ├── test_audio_handler.py        # Audio handler tests
@@ -579,7 +560,7 @@ leadershipbutton/
 | `src/leadership_button/api_client.py`    | Google Cloud Speech/TTS API integration            |
 | `src/leadership_button/audio_handler.py` | Audio recording, playback, and device management   |
 | `config/api_config.json`                 | Main application configuration                     |
-| `docs/settings/spec_driven_prompt.md`    | AI assistant development workflow                  |
+| `.specpilot/spec_driven_prompt.md`       | AI assistant development workflow                  |
 | `.env`                                   | Environment variables and secrets (not in git)     |
 | `env.example`                            | Template for environment setup                     |
 
@@ -748,7 +729,7 @@ tail -f logs/application.log
 
 1. **Fork the Repository**
 2. **Create Feature Branch**: `git checkout -b feature/amazing-feature`
-3. **Follow Spec-Driven Development**: See [docs/settings/spec_driven_prompt.md](docs/settings/spec_driven_prompt.md)
+3. **Follow Spec-Driven Development**: See [.specpilot/spec_driven_prompt.md](.specpilot/spec_driven_prompt.md)
 4. **Write Tests**: Maintain 100% component coverage
 5. **Update Documentation**: Keep README and specs current
 6. **Submit Pull Request**: Include comprehensive description

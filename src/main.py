@@ -8,7 +8,9 @@ for development, production, and testing environments.
 """
 
 import argparse
+import json
 import logging
+import os
 import signal
 import sys
 import time
@@ -38,9 +40,31 @@ class ApplicationManager:
 
     def setup_logging(self, mode: str = "development") -> None:
         """Configure application logging based on mode."""
+        # Check environment variable for verbose logging
+        verbose_logging = os.getenv("VERBOSE_LOGGING", "").lower() == "true"
+
+        # Try to read verbose logging from config file
+        try:
+            if mode == "development":
+                dev_config_file = "config/api_config.development.json"
+                if Path(dev_config_file).exists():
+                    with open(dev_config_file, "r") as f:
+                        dev_config = json.load(f)
+                        verbose_logging = dev_config.get("development", {}).get(
+                            "verbose_logging", verbose_logging
+                        )
+        except Exception:
+            pass  # Fall back to environment variable or default
+
         if mode == "development":
             log_level = logging.DEBUG
-            log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+            if verbose_logging:
+                log_format = (
+                    "%(asctime)s - %(name)s - %(levelname)s - "
+                    "%(funcName)s:%(lineno)d - %(message)s"
+                )
+            else:
+                log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
         else:  # production
             log_level = logging.INFO
             log_format = "%(asctime)s - %(levelname)s - %(message)s"
@@ -53,6 +77,11 @@ class ApplicationManager:
                 logging.FileHandler("logs/application.log"),
             ],
         )
+
+        # Set verbose logging for our application modules if enabled
+        if verbose_logging:
+            logging.getLogger("leadership_button").setLevel(logging.DEBUG)
+            self.logger.info("Verbose logging enabled")
 
         # Suppress verbose library logs in production
         if mode == "production":
