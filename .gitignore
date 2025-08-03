@@ -62,3 +62,21 @@ venv.bak/
 
 # Node
 node_modules/
+<<<<<<< Updated upstream
+=======
+
+# Secrets and credentials
+service-account.json
+service-account.json.backup
+credentials.json
+*.key
+*.pem
+.env
+.env.local
+.env.*.local
+
+# Config files with potential secrets
+config/*credentials*
+config/*secret*
+.env
+>>>>>>> Stashed changes
