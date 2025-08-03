@@ -42,6 +42,76 @@ You **MUST** adhere to the following file naming and location conventions for al
 - **Test Files**: Must be placed in `tests/` and named `test_[feature_name].py`, corresponding to a source file. All meta data for tests will be in `tests/data` categorized within subsequent subdirectories for understanding.
 - **Scripts**: Must be placed in `scripts/` and named descriptively (e.g., `deploy_to_pi.py`).
 
+## 📝 Notepad System
+
+### Purpose
+
+The `docs/notepad.md` file serves as a persistent scratchpad for developers to keep track of:
+
+- **Ideas and brainstorming notes**: Capture spontaneous thoughts and creative solutions
+- **To-do items**: Track tasks, reminders, and action items across development sessions
+- **Decision records**: Document key decisions and their rationale
+- **Implementation notes**: Store technical insights, gotchas, and best practices discovered during development
+- **Session continuity**: Maintain context between different development sessions
+
+### Usage
+
+- The AI assistant automatically listens for commands like "Add to notepad:" and will append content with timestamps and mode context
+- Use "Organize Notepad" command to automatically reorganize content into categorized sections (Ideas, To-Do Items, Decisions, Technical Notes, Action Items)
+- The notepad contents are summarized at the end of every AI response to keep developers informed
+- Developers can manually edit the file to organize, clean up, or restructure notes as needed
+- The notepad is checked during initialization and deep check procedures to ensure accessibility
+
+### Structure
+
+The notepad uses a simple markdown structure with timestamped entries. When using "Organize Notepad", content is automatically categorized:
+
+**Raw/Chronological Format:**
+
+```markdown
+# Development Notepad
+
+## [YYYY-MM-DD HH:MM:SS] - Mode Context
+
+- Note content here
+- Additional details
+
+## [YYYY-MM-DD HH:MM:SS] - Mode Context
+
+- Another note
+```
+
+**Organized Format (after "Organize Notepad" command):**
+
+```markdown
+# Development Notepad
+
+## 💡 Ideas
+
+- Creative solutions and brainstorming items
+- Feature concepts and improvements
+
+## ✅ To-Do Items
+
+- Active tasks and reminders
+- Pending action items
+
+## 🎯 Decisions
+
+- Key decisions made and rationale
+- Architecture choices and trade-offs
+
+## 🔧 Technical Notes
+
+- Implementation insights and gotchas
+- Best practices discovered
+
+## 📋 Action Items
+
+- Immediate next steps
+- Follow-up tasks
+```
+
 ## 📄 Documentation Templates
 
 This section contains the official templates for all project documentation, as defined in the master `.specpilot/spec_driven_prompt.md`.
