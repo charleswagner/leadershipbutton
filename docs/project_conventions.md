@@ -30,7 +30,7 @@ The `.specpilot/` directory contains the core files that define the agent's beha
 
 ### Commit Configuration and Log Analysis
 
-The `commitconfiguration` section in `.specpilot/engine/config.json` controls how the framework analyzes development sessions and generates intelligent commit messages.
+The `commitconfiguration` section in `.specpilot/workspace/config/config.json` (project override) controls how the framework analyzes development sessions and generates intelligent commit messages.
 
 #### Configuration Options:
 
@@ -55,7 +55,7 @@ The `commitconfiguration` section in `.specpilot/engine/config.json` controls ho
 - **Engine Control**: All configuration changes are managed by the SpecPilot engine
 - **Reference Documentation**: See `.specpilot/engine/spec_driven_prompt.md` for all available options
 - **Validation**: The engine validates all configuration changes before applying them
-- **DO NOT EDIT MANUALLY**: The `.specpilot/engine/config.json` file should not be edited directly
+- **DO NOT EDIT MANUALLY**: The `.specpilot/workspace/config/config.json` file should not be edited directly (use Config Mode)
 
 #### Usage:
 

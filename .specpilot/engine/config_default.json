@@ -1,8 +1,10 @@
 {
+  "_USER NOTE": "CONFIG MODE will update override config ./specpilot/workspace/config/config.json",
   "_warning": "DO NOT EDIT MANUALLY - Configuration managed by SpecPilot engine. See .specpilot/engine/spec_driven_prompt.md for available options.",
+  "_description": "VERBOSE DEFAULT CONFIGURATION - Maximum logging and analytics enabled for comprehensive development tracking",
   "logging": {
     "verbose_mode": true,
-    "notepad_summary": "one-line",
+    "notepad_summary": "command",
     "track_model": true
   },
   "commitconfiguration": {

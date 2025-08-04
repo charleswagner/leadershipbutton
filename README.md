@@ -18,18 +18,14 @@ We enforce a strict separation of concerns between the **application code** (`sr
 │   ├── engine/                    # Core framework files
 │   │   ├── spec_driven_prompt.md  # Master protocol (AI assistant "constitution")
 │   │   └── bootstrap_py.md        # Development environment setup guide
-│   ├── examples/                  # Configuration templates
-│   │   ├── default.json           # Full configuration template
-│   │   └── minimal.json           # Minimal configuration template
-│   ├── workspace/                 # Runtime workspace
-│   │   ├── notepad.md             # Developer scratchpad and notes
-│   │   └── logs/                  # Runtime logs
-│   │       ├── specpilot.log      # Milestone log (high-level progress)
-│   │       └── specpilot_verbose.log # Verbose log (complete transcripts)
-│   ├── engine/                    # Core framework files
-│   │   ├── spec_driven_prompt.md  # Master protocol (AI assistant "constitution")
-│   │   ├── bootstrap_py.md        # Development environment setup guide
-│   │   └── config.json            # Framework configuration (engine-managed)
+│   ├── config/                # Project-specific overrides
+│   │   ├── config.json        # (Optional) Project config override
+│   │   └── spec_driven_prompt_override.md # (Optional) Project prompt override
+│   ├── notepads/              # Developer notes
+│   │   └── notepad.md         # Developer scratchpad and notes
+│   └── logs/                  # Runtime logs
+│       ├── specpilot.log      # Milestone log (high-level progress)
+│       └── specpilot_verbose.log # Verbose log (complete transcripts)
 ├── docs/                          # Project documentation
 │   ├── plans/                     # Project planning documents
 │   ├── specs/                     # Feature specifications
@@ -45,17 +41,17 @@ We enforce a strict separation of concerns between the **application code** (`sr
 - **`spec_driven_prompt.md`**: Master protocol defining AI assistant behavior, modes, and rules
 - **`bootstrap_py.md`**: Complete setup guide for new development environments
 
-**Examples** (`.specpilot/examples/`): Configuration templates for different use cases
+**Configuration Override** (`.specpilot/workspace/config/`): Project-specific overrides
 
-- **`default.json`**: Full-featured configuration with all options enabled
-- **`minimal.json`**: Streamlined configuration for basic usage
+- **`config.json`**: Project-specific configuration that overrides defaults
+- **`spec_driven_prompt_override.md`**: Project-specific prompt rules that take precedence
 
 **Workspace** (`.specpilot/workspace/`): Runtime files that change during development
 
-- **`notepad.md`**: Persistent developer scratchpad for notes and ideas
+- **`notepads/notepad.md`**: Persistent developer scratchpad for notes and ideas
 - **`logs/`**: Development audit trail and conversation history
 
-**Configuration** (`.specpilot/engine/config.json`): Active framework settings
+**Configuration** (`.specpilot/engine/config_default.json`): Default framework settings
 
 - Controls logging behavior and commit intelligence features
 - **Commit Configuration**: Customize commit analysis, scoring, and intelligence features
