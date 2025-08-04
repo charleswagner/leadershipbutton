@@ -1,6 +1,6 @@
 {
   "ignore": [
-    "spec/buildlog/buildlog.log",
+    ".specpilot/workspace/logs/specpilot.log",
     "**/__pycache__/",
     ".venv/",
     "venv/",

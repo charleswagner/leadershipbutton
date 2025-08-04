@@ -1,0 +1,14 @@
+{
+  "_description": "Default SpecPilot configuration with all features enabled",
+  "logging": {
+    "verbose_mode": true,
+    "notepad_summary": "one-line",
+    "track_model": true
+  },
+  "commitconfiguration": {
+    "commit_intelligence": true,
+    "session_analytics": true,
+    "frustration_scoring": true,
+    "productivity_metrics": true
+  }
+}
