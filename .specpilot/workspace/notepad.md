@@ -10,7 +10,7 @@ order of opperarions
 2. extract specpilot as open souece
 3. probe it woeks with rekindle bootstrap
 4. ise old rekindle as rederence and olan out nee rekindsl 
-
+while wfieing rekindle document how to readite a messy coacbase with spec deiven developement 
 
 ## 💡 Ideas
 
