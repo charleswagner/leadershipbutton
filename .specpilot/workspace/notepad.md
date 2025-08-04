@@ -4,6 +4,14 @@ _Persistent scratchpad for ideas, to-dos, decisions, and development notes_
 
 ---
 
+order of opperarions
+
+1.  finish this peojexf
+2. extract specpilot as open souece
+3. probe it woeks with rekindle bootstrap
+4. ise old rekindle as rederence and olan out nee rekindsl 
+
+
 ## 💡 Ideas
 
 ### Unified Configuration System ✅ _IMPLEMENTED_
