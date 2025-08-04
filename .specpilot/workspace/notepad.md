@@ -4,44 +4,17 @@ _Persistent scratchpad for ideas, to-dos, decisions, and development notes_
 
 ---
 
-order of opperarions
-
-1.  finish this peojexf
-2.  extract specpilot as open souece
-3.  probe it woeks with rekindle bootstrap
-4.  ise old rekindle as rederence and olan out nee rekindsl
-    while wfieing rekindle document how to readite a messy coacbase with spec deiven developement
-
-There is no need for the examples directory in .specpilot any more. I need to have it deleted.
-
-Add a Commit notes md that is like a log but keeps track of all commits in a md file.
+Add a user override spec in the workspace. We will have three directories. logs, notepads, and config. Config will allow for overrides to the prompt. in spec driven prompt and will haev a config that overrides the default config.
 
 ## 💡 Ideas
 
-### Unified Configuration System ✅ _IMPLEMENTED_
+### Enhanced Development Analytics & Metrics
 
-**One comprehensive config system managing all SpecPilot behavior:**
-
-- **Logging Controls**: Toggle verbose mode, notepad summary format (command vs. one-line), emotional outputs
-- **Model Tracking**: Track which AI model is being used (Claude, Gemini, etc.) in all log entries
-- **Intelligence Features**: Configure commit intelligence, agent effectiveness scoring, productivity metrics
-- **Workflow Customization**: User preferences for complexity level, feature toggles, UI preferences
-
-### Development Analytics & Metrics
-
-**Enhanced tracking and reporting for development sessions:**
+**Comprehensive tracking and reporting for development sessions:**
 
 - **Session Percentage Tracking**: Show percentage time spent vibing, architecting, designing, product designing, and spec-driven development
 - **Development Dimension Commands**: Add command to get status update on current development focus across all dimensions
 - **Performance Insights**: Lines per hour, features per session, time per decision for continuous improvement
-
-### Integrated Workflow Intelligence ✅ _IMPLEMENTED_
-
-**Single system combining commit intelligence + development analytics:**
-
-- **Story-Driven Commits**: Auto-generate commit narratives with productivity metrics, time analysis, agent effectiveness
-- **Session Analytics**: Track frustration scores, vibe dependency, decision velocity across development sessions
-- **Emotional Context**: Optional experimental analysis of developer state and workflow patterns
 
 ### Enhanced Notepad System
 
@@ -60,8 +33,14 @@ Add a Commit notes md that is like a log but keeps track of all commits in a md 
 
 ## ✅ To-Do Items
 
+### High Priority
+
+- **Remove .specpilot/examples/ directory** (no longer needed after reorganization)
 - **Implement development analytics & metrics system** (session percentage tracking, dimension status commands)
 - **Design enhanced notepad system** (multiple notepads, cleanup commands, smart organization)
+
+### Medium Priority
+
 - **Establish centralized script organization** (update conventions, create .specpilot/scripts structure)
 
 ## 🎯 Decisions
@@ -81,17 +60,19 @@ Add a Commit notes md that is like a log but keeps track of all commits in a md 
 
 ## 📋 Action Items
 
-### ✅ Completed
+### 🔄 Active Tasks
 
-- **Enhanced Commit Mode protocol** with intelligence analysis
-- **Integrated scoring system** (frustration, productivity, agent, vibe)
-- **Enhanced commit intelligence** with hybrid format testing
-- **Unified configuration system** with .specpilot/config.json structure
-- **Notepad summary specification** clarified in spec_driven_prompt.md
-
-### 🔄 In Progress
-
+- **Directory cleanup** - Remove obsolete .specpilot/examples/ directory and update references
 - **Centralized script organization structure** and project conventions update
+
+### ✅ Recently Completed
+
+- Enhanced Commit Mode protocol with intelligence analysis
+- Integrated scoring system (frustration, productivity, agent, vibe)
+- Enhanced commit intelligence with hybrid format testing
+- Unified configuration system with .specpilot/engine/config.json structure
+- Notepad summary specification clarified in spec_driven_prompt.md
+- SpecPilot framework directory reorganization (engine/, workspace/, examples/)
 
 ---
 
