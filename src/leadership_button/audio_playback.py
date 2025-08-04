@@ -15,7 +15,7 @@ import time
 from typing import Optional, Any
 from pathlib import Path
 
-from .audio_handler import AudioHandler, AudioConfig, AudioData
+from .audio_handler import AudioHandler, AudioConfig, AudioData, audio_config_manager
 
 logger = logging.getLogger(__name__)
 
@@ -23,18 +23,34 @@ logger = logging.getLogger(__name__)
 class AudioPlaybackManager:
     """
     Centralized audio playback manager that handles all audio sources and formats.
+    Uses centralized audio configuration for consistency.
     """
 
-    def __init__(self, audio_config: Optional[AudioConfig] = None):
+    def __init__(
+        self,
+        audio_config: Optional[AudioConfig] = None,
+        api_config_data: Optional[Any] = None,
+    ):
         """
         Initialize the audio playback manager.
 
         Args:
-            audio_config: Audio configuration. If None, uses default config.
+            audio_config: Audio configuration. If None, uses centralized config.
+            api_config_data: API configuration data to update centralized config.
         """
+        # Update centralized config if API config provided
+        if api_config_data:
+            audio_config_manager.update_config(api_config_data)
+
+        # Use provided config or create from centralized manager
         self.audio_config = audio_config or AudioConfig()
         self.audio_handler = AudioHandler(self.audio_config)
         self.logger = logging.getLogger(__name__)
+
+        playback_config = audio_config_manager.get_playback_config()
+        self.logger.info(
+            f"🔧 AudioPlaybackManager: Using centralized playback config ({playback_config['sample_rate']} Hz)"
+        )
 
     def play_audio_response(
         self, audio_response: Any, description: str = "audio"
@@ -50,18 +66,29 @@ class AudioPlaybackManager:
             True if playback started successfully, False otherwise
         """
         try:
-            # Extract audio data based on response type
-            audio_data = self._extract_audio_data(audio_response)
-            if not audio_data:
-                self.logger.error(f"Failed to extract audio data from {description}")
-                return False
+            # For AudioData objects, pass directly to preserve sample rate info
+            if isinstance(audio_response, AudioData):
+                success = self.audio_handler.play_audio(audio_response)
+                audio_size = len(audio_response.data)
+                self.logger.info(
+                    f"🔊 PLAYING AudioData: {audio_response.sample_rate} Hz, {audio_size} bytes"
+                )
+            else:
+                # Extract audio data for other response types
+                audio_data = self._extract_audio_data(audio_response)
+                if not audio_data:
+                    self.logger.error(
+                        f"Failed to extract audio data from {description}"
+                    )
+                    return False
+                success = self.audio_handler.play_audio(audio_data)
+                audio_size = len(audio_data)
+                self.logger.info(f"🔊 PLAYING raw bytes: {audio_size} bytes")
 
-            # Play the audio
-            success = self.audio_handler.play_audio(audio_data)
             if success:
                 self.logger.info(
                     f"✅ Audio playback started for {description}: "
-                    f"{len(audio_data)} bytes"
+                    f"{audio_size} bytes"
                 )
                 return True
             else:
@@ -92,9 +119,9 @@ class AudioPlaybackManager:
             if not self.play_audio_response(audio_response, description):
                 return False
 
-            # Wait for completion with timeout (5 seconds max for testing)
+            # Wait for completion with timeout (90 seconds max for full audio)
             self.logger.info(f"⏱️  Waiting for {description} playback to complete...")
-            timeout_seconds = 5.0
+            timeout_seconds = 90.0
             elapsed = 0.0
             sleep_interval = 0.1
 

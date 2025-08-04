@@ -9,7 +9,7 @@ import logging
 import threading
 import time
 import wave
-from typing import Optional, Callable
+from typing import Optional, Callable, Dict, Any
 from enum import Enum
 
 # Core audio dependencies
@@ -42,25 +42,42 @@ class DeviceState(Enum):
 
 
 class AudioConfig:
-    """Configuration class for audio handling parameters"""
+    """Configuration class for audio handling parameters - uses centralized manager"""
 
-    def __init__(self):
-        # Audio parameters
-        self.sample_rate: int = 16000
-        self.channels: int = 1
-        self.chunk_size: int = 1024
-        self.format: str = "wav"
-        self.device_index: Optional[int] = None
+    def __init__(self, api_config_data: Optional[Dict[str, Any]] = None):
+        # Update the centralized config if provided
+        if api_config_data:
+            audio_config_manager.update_config(api_config_data)
+
+        # Get configuration from centralized manager
+        recording_config = audio_config_manager.get_recording_config()
+        playback_config = audio_config_manager.get_playback_config()
+        hardware_config = audio_config_manager.get_hardware_config()
+
+        # Recording parameters (from microphone)
+        self.sample_rate: int = recording_config["sample_rate"]
+        self.channels: int = recording_config["channels"]
+        self.chunk_size: int = recording_config["chunk_size"]
+        self.format: str = recording_config["format"]
+        self.device_index: Optional[int] = recording_config["device_index"]
+        self.max_recording_duration: int = recording_config["max_recording_duration"]
+
+        # Playback parameters (to speakers) - CRITICAL: must match TTS output
+        self.playback_sample_rate: int = playback_config["sample_rate"]
+        self.playback_channels: int = playback_config["channels"]
+        self.playback_chunk_size: int = playback_config["chunk_size"]
+        self.playback_format: str = playback_config["format"]
 
         # Hardware parameters (Raspberry Pi)
-        self.button_pin: Optional[int] = None
-        self.led_pin: Optional[int] = None
-
-        # Recording parameters
-        self.max_recording_duration: int = 30  # seconds
+        self.button_pin: Optional[int] = hardware_config["button_pin"]
+        self.led_pin: Optional[int] = hardware_config["led_pin"]
 
         # PyAudio format mapping
         self.pyaudio_format = pyaudio.paInt16 if PYAUDIO_AVAILABLE else None
+
+        logging.info(
+            f"🔧 AudioConfig: Recording={self.sample_rate}Hz, Playback={self.playback_sample_rate}Hz"
+        )
 
     def validate(self) -> bool:
         """Validate configuration parameters"""
@@ -72,6 +89,8 @@ class AudioConfig:
             raise ValueError("Chunk size must be positive")
         if self.max_recording_duration <= 0:
             raise ValueError("Max recording duration must be positive")
+        if self.playback_sample_rate <= 0:
+            raise ValueError("Playback sample rate must be positive")
         return True
 
 
@@ -111,6 +130,106 @@ class AudioData:
     def get_file_size(self) -> int:
         """Get the size of audio data in bytes"""
         return len(self.data)
+
+
+class AudioConfigManager:
+    """Centralized audio configuration management - SINGLE SOURCE OF TRUTH"""
+
+    _instance = None
+    _config_data = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(AudioConfigManager, cls).__new__(cls)
+        return cls._instance
+
+    def __init__(self):
+        if self._config_data is None:
+            self._load_default_config()
+
+    def _load_default_config(self):
+        """Load default audio configuration - can be overridden by API config"""
+        self._config_data = {
+            # Recording settings (from microphone)
+            "recording_sample_rate": 16000,
+            "recording_channels": 1,
+            "recording_chunk_size": 1024,
+            "recording_format": "int16",
+            # Playback settings (to speakers) - MUST match TTS output
+            "playback_sample_rate": 24000,  # Google TTS default
+            "playback_channels": 1,
+            "playback_chunk_size": 1024,
+            "playback_format": "int16",
+            # Hardware settings
+            "device_index": None,
+            "max_recording_duration": 30,
+            "button_pin": None,
+            "led_pin": None,
+        }
+        logging.info("🔧 AudioConfigManager: Default configuration loaded")
+
+    def update_config(self, config_data: Dict[str, Any]):
+        """Update configuration from external source (API config files)"""
+        if "audio_settings" in config_data:
+            audio_settings = config_data["audio_settings"]
+
+            # Map API config to our internal structure
+            if "sample_rate" in audio_settings:
+                self._config_data["recording_sample_rate"] = audio_settings[
+                    "sample_rate"
+                ]
+            if "output_sample_rate" in audio_settings:
+                self._config_data["playback_sample_rate"] = audio_settings[
+                    "output_sample_rate"
+                ]
+            if "channels" in audio_settings:
+                self._config_data["recording_channels"] = audio_settings["channels"]
+                self._config_data["playback_channels"] = audio_settings["channels"]
+            if "chunk_size" in audio_settings:
+                self._config_data["recording_chunk_size"] = audio_settings["chunk_size"]
+                self._config_data["playback_chunk_size"] = audio_settings["chunk_size"]
+            if "format" in audio_settings:
+                self._config_data["recording_format"] = audio_settings["format"]
+                self._config_data["playback_format"] = audio_settings["format"]
+
+            logging.info(f"🔧 AudioConfigManager: Updated from API config")
+            logging.info(
+                f"   📊 Recording: {self._config_data['recording_sample_rate']} Hz"
+            )
+            logging.info(
+                f"   🔊 Playback: {self._config_data['playback_sample_rate']} Hz"
+            )
+
+    def get_recording_config(self) -> Dict[str, Any]:
+        """Get configuration for audio recording (microphone)"""
+        return {
+            "sample_rate": self._config_data["recording_sample_rate"],
+            "channels": self._config_data["recording_channels"],
+            "chunk_size": self._config_data["recording_chunk_size"],
+            "format": self._config_data["recording_format"],
+            "device_index": self._config_data["device_index"],
+            "max_recording_duration": self._config_data["max_recording_duration"],
+        }
+
+    def get_playback_config(self) -> Dict[str, Any]:
+        """Get configuration for audio playback (speakers)"""
+        return {
+            "sample_rate": self._config_data["playback_sample_rate"],
+            "channels": self._config_data["playback_channels"],
+            "chunk_size": self._config_data["playback_chunk_size"],
+            "format": self._config_data["playback_format"],
+        }
+
+    def get_hardware_config(self) -> Dict[str, Any]:
+        """Get configuration for hardware (Raspberry Pi)"""
+        return {
+            "button_pin": self._config_data["button_pin"],
+            "led_pin": self._config_data["led_pin"],
+        }
+
+
+# Global instance - SINGLE SOURCE OF TRUTH for all audio configuration
+audio_config_manager = AudioConfigManager()
 
 
 class AudioHandler:
@@ -272,11 +391,33 @@ class AudioHandler:
 
         logging.debug("Recording thread finished")
 
-    def play_audio(self, audio_data: bytes) -> bool:
-        """Play audio data through speakers"""
+    def play_audio(self, audio_data) -> bool:
+        """Play audio data through speakers
+
+        Args:
+            audio_data: Either raw bytes or AudioData object
+        """
         if not PYAUDIO_AVAILABLE or not self.audio:
             logging.error("PyAudio not available for playback")
             return False
+
+        # Extract raw bytes and sample rate
+        if isinstance(audio_data, AudioData):
+            raw_bytes = audio_data.data
+            playback_sample_rate = audio_data.sample_rate
+            channels = audio_data.channels
+            logging.info(
+                f"🔊 PLAYBACK: Using AudioData sample rate: {playback_sample_rate} Hz"
+            )
+        else:
+            # Legacy support for raw bytes - use CENTRALIZED playback config
+            raw_bytes = audio_data
+            playback_config = audio_config_manager.get_playback_config()
+            playback_sample_rate = playback_config["sample_rate"]
+            channels = playback_config["channels"]
+            logging.info(
+                f"🔊 PLAYBACK: Using centralized config sample rate: {playback_sample_rate} Hz (raw bytes)"
+            )
 
         with self.state_lock:
             if self.state == DeviceState.PLAYING:
@@ -293,7 +434,9 @@ class AudioHandler:
             # Start new playback
             self.stop_playback_event.clear()
             self.playback_thread = threading.Thread(
-                target=self._play_audio_stream, args=(audio_data,), daemon=True
+                target=self._play_audio_stream,
+                args=(raw_bytes, playback_sample_rate, channels),
+                daemon=True,
             )
             self.playback_thread.start()
 
@@ -305,7 +448,7 @@ class AudioHandler:
                 self.state = DeviceState.ERROR
             return False
 
-    def _play_audio_stream(self, audio_data: bytes):
+    def _play_audio_stream(self, audio_data: bytes, sample_rate: int, channels: int):
         """Internal method for audio playback"""
         playback_stream = None
 
@@ -313,8 +456,8 @@ class AudioHandler:
             # Open playback stream
             playback_stream = self.audio.open(
                 format=self.config.pyaudio_format,
-                channels=self.config.channels,
-                rate=self.config.sample_rate,
+                channels=channels,
+                rate=sample_rate,
                 output=True,
                 frames_per_buffer=self.config.chunk_size,
             )
@@ -325,7 +468,7 @@ class AudioHandler:
                 if self.stop_playback_event.is_set():
                     break
 
-                chunk = audio_data[i:i + chunk_size]
+                chunk = audio_data[i : i + chunk_size]
                 playback_stream.write(chunk)
 
             logging.info("Audio playback completed")

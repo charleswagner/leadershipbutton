@@ -2,6 +2,66 @@
 
 This document is the official source of truth for all development standards in this project.
 
+## Testing Conventions
+
+### CRITICAL RULE: No Business Logic in Tests
+
+**Tests must contain ONLY orchestration and verification logic. Business logic belongs exclusively in the main codebase.**
+
+#### ✅ What Tests SHOULD Contain:
+
+- **Orchestration Logic**: Setting up test scenarios, mocking dependencies, calling methods
+- **Verification Logic**: Assertions, comparisons, validation of expected outcomes
+- **Test Infrastructure**: Helper methods for test setup, data creation, cleanup
+- **Mock Configuration**: Defining mock behaviors and responses
+
+#### ❌ What Tests MUST NEVER Contain:
+
+- **Duplicate Business Logic**: Re-implementing main application functionality
+- **Alternative Implementations**: Different ways of achieving the same business outcome
+- **Production Algorithms**: Core processing logic that should be in main code
+- **Configuration Logic**: Business rules about how the system should behave
+
+#### Examples of PROHIBITED Test Patterns:
+
+```python
+# ❌ BAD: Test contains business logic (audio processing)
+def test_audio_processing(self):
+    # This duplicates business logic from main code
+    sample_rate = 24000  # Should come from centralized config
+    audio_data = self.process_audio_manually(raw_bytes, sample_rate)
+    self.assertEqual(audio_data.sample_rate, 24000)
+
+# ✅ GOOD: Test only orchestrates and verifies
+def test_audio_processing(self):
+    # Only orchestration and verification
+    audio_result = self.api_client.text_to_speech("test")
+    self.assertEqual(audio_result.sample_rate, 24000)
+```
+
+#### Testing Anti-Patterns to AVOID:
+
+1. **Testing Theater**: Tests that print verbose output or "guidance" instead of asserting
+2. **Manual Interaction Tests**: Tests requiring human input (spacebar, keyboard interaction)
+3. **Business Logic Duplication**: Tests that re-implement main application functionality
+4. **Integration Wrapping**: Tests that just wrap the main application without adding value
+5. **Complex Test Logic**: Tests with threading, timeouts, or complex setup (test the wrong thing)
+
+#### Proper Test Strategy:
+
+1. **Unit Tests**: Test individual functions/methods with clear inputs and expected outputs
+2. **Integration Tests**: Run actual application components together, verify interactions
+3. **Mock-Based Tests**: Use mocks to isolate components and test specific behaviors
+4. **Error Scenario Coverage**: Test how components handle various error conditions
+5. **Manual Testing**: For complex integration scenarios, run the actual application
+
+#### Centralized Configuration Rule:
+
+- **Tests and main code MUST use the same configuration sources**
+- **No duplicate configuration paths between test and production code**
+- **All configuration should come from centralized managers/configs**
+- **Tests should never define their own business configuration values**
+
 ### The "Golden Thread": File Naming & Location
 
 To maintain clarity, every feature must follow a strict naming and location convention that creates a "golden thread" from specification to implementation to verification.

@@ -6,6 +6,22 @@ _Quick capture for ideas, tasks, and decisions_
 
 ## Ideas
 
+GOT THIS RESPONSE ONCE : - Pause for Effect. Need to figure otu how to program that in.
+Oh, honey, my heart goes out to you! (pause for effect) That sounds like a real tear-jerker, Willa. ..
+
+Need to fix session analytics.
+Duration Calendar time
+Duration working time
+
+Working time is based on adding up all log messages and estimate when people worked and when there were breaks.
+
+Want to add a feature to fill in the gaps while waiting for AI response. \
+
+- Rerd a bunch of Hi, blah blah blah
+- when the button is clicked immediately it says Hi there!
+- After button is released the canned propmts start talking.
+- then it comes in with the response from gemini.
+
 ### Enhanced Development Analytics & Metrics
 
 - **Session Percentage Tracking**: Show percentage time spent vibing, architecting, designing, product designing, and spec-driven development

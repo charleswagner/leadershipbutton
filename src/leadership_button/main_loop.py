@@ -69,6 +69,9 @@ class MainLoop:
         self.start_time = 0.0
         self.response_times: List[float] = []
 
+        # Initialize all components
+        self._initialize_components()
+
         self.logger.info("MainLoop initialization complete")
 
     def _load_config(self, config_path: Optional[str]) -> Dict[str, Any]:
@@ -83,41 +86,74 @@ class MainLoop:
         return {"audio": {"sample_rate": 16000, "channels": 1}, "api": {"timeout": 30}}
 
     def _initialize_components(self) -> None:
-        """Initialize all components required for the main loop."""
+        """Initialize all required components."""
         try:
-            config = self._load_config(self.config_path)
+            # Initialize API client with centralized audio config
+            config = APIConfig()
+            self.api_client = APIManager(config)
+            self.logger.info("API client initialized")
 
-            self.logger.info("Initializing audio handler...")
-            audio_config = AudioConfig()
-            for key, value in config.get("audio_settings", {}).items():
-                if hasattr(audio_config, key):
-                    setattr(audio_config, key, value)
+            # Initialize audio handler for microphone recording
+            from .audio_handler import AudioConfig, AudioHandler
+
+            audio_config = AudioConfig(config.config_data)
             self.audio_handler = AudioHandler(audio_config)
+            self.logger.info("Audio handler initialized for microphone recording")
 
-            self.logger.info("Initializing API client...")
-            api_config = APIConfig(self.config_path)
-            self.api_client = APIManager(api_config)
+            # Initialize audio playback manager with centralized config
+            self.playback_manager = AudioPlaybackManager(
+                api_config_data=config.config_data
+            )
+            self.logger.info(
+                "Audio playback manager initialized with centralized config"
+            )
 
-            self.logger.info("Initializing audio playback manager...")
-            self.playback_manager = AudioPlaybackManager()
-
-            self._setup_mock_ai_provider()
+            # Set up AI provider (Gemini Flash with mock fallback)
+            self._setup_ai_provider()
 
         except Exception as e:
-            self.logger.error(f"Failed to initialize components: {e}", exc_info=False)
-            if "Audio" in str(e):
-                self.logger.error("Failed to initialize audio handler")
+            self.logger.error(f"Failed to initialize components: {e}")
+            # Store the error for debugging
+            self._last_error = str(e)
+
+    def _setup_ai_provider(self) -> None:
+        """Set up the AI provider for leadership coaching."""
+        try:
+            # Try to set up Gemini Flash provider
+            from .gemini_provider import GeminiFlashProvider
+
+            gemini_config = {
+                "model": "gemini-1.5-flash",
+                "temperature": 0.7,
+                "max_tokens": 150,
+                "timeout": 30,
+            }
+
+            gemini_provider = GeminiFlashProvider(gemini_config)
+
+            if self.api_client:
+                self.api_client.set_ai_provider(gemini_provider)
+                self.logger.info("Gemini Flash AI provider set up successfully")
+
+        except (ImportError, ValueError, RuntimeError) as e:
+            # Fallback to mock provider if Gemini setup fails
+            self.logger.warning(f"Failed to set up Gemini Flash provider: {e}")
+            self.logger.info("Falling back to Mock AI provider")
+            self._setup_mock_ai_provider()
 
     def _setup_mock_ai_provider(self) -> None:
-        """Set up a mock AI provider for testing."""
+        """Set up a mock AI provider as fallback."""
+
+        # Import centralized prompts
+        from .prompts_config import PromptsConfig
 
         # This setup is for development/testing as per spec
         class MockAIProvider:
             def process_text(self, text: str, context: dict) -> str:
-                return f"You said: {text}"
+                return PromptsConfig.get_mock_response(text)
 
             def get_provider_name(self) -> str:
-                return "Mock AI Provider"
+                return PromptsConfig.get_mock_provider_name()
 
             def is_available(self) -> bool:
                 return True
@@ -127,7 +163,7 @@ class MainLoop:
 
         if self.api_client:
             self.api_client.set_ai_provider(MockAIProvider())
-            self.logger.info("Mock AI provider set up successfully")
+            self.logger.info("Mock AI provider set up as fallback")
 
     def start(self) -> None:
         """Start the main application loop."""
@@ -289,8 +325,9 @@ class MainLoop:
 
         try:
             self._transition_state(ApplicationState.SPEAKING)
-            audio_to_play = response.data if hasattr(response, "data") else response
-            self.playback_manager.play_audio_and_wait(audio_to_play, "api_response.raw")
+            # Pass the full response object to preserve AudioData sample rate info
+            # DO NOT extract .data - that loses the sample rate information!
+            self.playback_manager.play_audio_and_wait(response, "api_response")
             self._handle_audio_complete()
         except Exception as e:
             self._handle_error(e)

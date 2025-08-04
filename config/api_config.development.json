@@ -9,6 +9,21 @@
     "verbose_logging": true,
     "simulate_network_delays": false
   },
+  "text_to_speech": {
+    "language_code": "en-US",
+    "voice_name": "en-US-Wavenet-F",
+    "audio_encoding": "LINEAR16",
+    "speaking_rate": 1.0,
+    "pitch": 0.0,
+    "volume_gain_db": 8.0
+  },
+  "audio_settings": {
+    "sample_rate": 16000,
+    "output_sample_rate": 24000,
+    "channels": 1,
+    "chunk_size": 1024,
+    "format": "int16"
+  },
   "performance": {
     "cache_tts_responses": false
   }

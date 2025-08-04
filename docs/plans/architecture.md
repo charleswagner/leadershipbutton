@@ -7,6 +7,7 @@
 - All user credentials managed through environment variables
 - No secrets stored in code or version control
 - Google Cloud credentials secured via service account authentication
+- **All private keys must be stored in .env file** - API keys, authentication tokens, and sensitive credentials shall be managed exclusively through environment variables loaded from .env files
 
 ### Performance
 

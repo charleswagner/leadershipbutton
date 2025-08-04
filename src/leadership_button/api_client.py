@@ -9,9 +9,12 @@ import json
 import logging
 import os
 import time
+import signal
+from contextlib import contextmanager
 from typing import Optional, List, Any
 from enum import Enum
 from pathlib import Path
+import re
 
 # Google Cloud dependencies
 try:
@@ -49,6 +52,7 @@ class APIState(Enum):
 
     INITIALIZING = "initializing"
     READY = "ready"
+    AI_ONLY = "ai_only"  # Only AI provider available, speech/TTS unavailable
     PROCESSING_SPEECH = "processing_speech"
     PROCESSING_TTS = "processing_tts"
     ERROR = "error"
@@ -139,9 +143,9 @@ class APIConfig:
     def validate(self) -> bool:
         """Validate configuration parameters"""
         # Validate API settings
-        if self.api_settings["timeout_seconds"] <= 0:
+        if self.api_settings["timeout"] <= 0:
             raise ValueError("API timeout must be positive")
-        if self.api_settings["retry_max_attempts"] <= 0:
+        if self.api_settings["max_retries"] <= 0:
             raise ValueError("Retry max attempts must be positive")
 
         # Validate Google Cloud settings
@@ -149,24 +153,26 @@ class APIConfig:
             raise ValueError("Google Cloud region must be specified")
 
         # Validate speech settings
-        speech_config = self.google_cloud["speech_to_text"]
-        if speech_config["sample_rate_hertz"] <= 0:
-            raise ValueError("Speech sample rate must be positive")
+        if "speech_to_text" in self.config_data:
+            speech_config = self.config_data["speech_to_text"]
+            if "sample_rate" in speech_config and speech_config["sample_rate"] <= 0:
+                raise ValueError("Speech sample rate must be positive")
 
         # Validate TTS settings
-        tts_config = self.google_cloud["text_to_speech"]
-        if tts_config["speaking_rate"] <= 0:
-            raise ValueError("TTS speaking rate must be positive")
+        if "text_to_speech" in self.config_data:
+            tts_config = self.config_data["text_to_speech"]
+            if "speaking_rate" in tts_config and tts_config["speaking_rate"] <= 0:
+                raise ValueError("TTS speaking rate must be positive")
 
         return True
 
     def get_speech_config(self) -> dict:
         """Get speech-to-text configuration"""
-        return self.google_cloud["speech_to_text"]
+        return self.config_data.get("speech_to_text", {})
 
     def get_tts_config(self) -> dict:
         """Get text-to-speech configuration"""
-        return self.google_cloud["text_to_speech"]
+        return self.config_data.get("text_to_speech", {})
 
     def get_api_config(self) -> dict:
         """Get API behavior configuration"""
@@ -196,11 +202,11 @@ class APIConfig:
 
     @property
     def timeout_seconds(self) -> int:
-        return self.api_settings["timeout_seconds"]
+        return self.api_settings["timeout"]
 
     @property
     def retry_max_attempts(self) -> int:
-        return self.api_settings["retry_max_attempts"]
+        return self.api_settings["max_retries"]
 
 
 class TranscriptionResult:
@@ -278,9 +284,15 @@ class SpeechClient:
 
     def transcribe_audio(self, audio_data) -> Optional[TranscriptionResult]:
         """Convert audio data to text"""
-        if self.state != APIState.READY:
+        if self.state not in [APIState.READY, APIState.AI_ONLY]:
             logging.error(f"Cannot transcribe audio in state: {self.state}")
             return None
+
+        # Check if speech client is available
+        if not self.client:
+            error_msg = "❌ Speech-to-Text service unavailable: Missing Google Cloud credentials\nPlease set up GOOGLE_APPLICATION_CREDENTIALS environment variable\nSee: https://cloud.google.com/docs/authentication/external/set-up-adc"
+            logging.error("Speech-to-Text client not initialized")
+            raise RuntimeError(error_msg)
 
         start_time = time.time()
 
@@ -335,6 +347,24 @@ class SpeechClient:
                     )
                     transcription.language_code = speech_config["language_code"]
                     transcription.processing_time = time.time() - start_time
+
+                    # 🔍 CLEAR SPEECH-TO-TEXT LOGGING
+                    logging.info("=" * 60)
+                    logging.info("🎤 SPEECH-TO-TEXT RESULT:")
+                    logging.info(f"📝 TRANSCRIBED TEXT: '{transcription.text}'")
+                    logging.info(f"📊 CONFIDENCE: {transcription.confidence:.2f}")
+                    logging.info(
+                        f"⏱️  PROCESSING TIME: {transcription.processing_time:.2f}s"
+                    )
+                    logging.info("=" * 60)
+
+                    # Also print to console for immediate visibility
+                    print("\n" + "=" * 60)
+                    print("🎤 SPEECH-TO-TEXT RESULT:")
+                    print(f"📝 TRANSCRIBED TEXT: '{transcription.text}'")
+                    print(f"📊 CONFIDENCE: {transcription.confidence:.2f}")
+                    print(f"⏱️  PROCESSING TIME: {transcription.processing_time:.2f}s")
+                    print("=" * 60)
 
                     logging.info(
                         f"Transcription completed: {len(transcription.text)} chars, "
@@ -440,11 +470,120 @@ class TTSClient:
             # Prepare synthesis request
             synthesis_input = texttospeech.SynthesisInput(text=text)
 
-            voice = texttospeech.VoiceSelectionParams(
-                language_code=voice_config.language_code,
-                name=voice_config.name,
-                ssml_gender=texttospeech.SsmlVoiceGender.NEUTRAL,
+            # 🔍 COMPLETE TTS CONFIGURATION LOGGING
+            logging.info("=" * 60)
+            logging.info("🔊 TEXT-TO-SPEECH COMPLETE CONFIGURATION:")
+            logging.info("=" * 60)
+
+            # Voice Configuration
+            logging.info("🎤 VOICE CONFIGURATION:")
+            logging.info(f"  📛 Voice Name: {voice_config.name}")
+            logging.info(f"  🌍 Language: {voice_config.language_code}")
+            logging.info(f"  ⚡ Speaking Rate: {voice_config.speaking_rate}x")
+            logging.info(f"  🎵 Pitch: {voice_config.pitch} semitones")
+            logging.info(f"  🔊 Volume Gain: +{voice_config.volume_gain_db} dB")
+
+            # Audio Configuration
+            audio_settings = self.config.audio_settings
+            logging.info("🔧 AUDIO CONFIGURATION:")
+            logging.info(
+                f"  📊 Output Sample Rate: {audio_settings['output_sample_rate']} Hz"
             )
+            logging.info(f"  🎙️  Input Sample Rate: {audio_settings['sample_rate']} Hz")
+            logging.info(f"  📻 Channels: {audio_settings['channels']}")
+            logging.info(f"  📦 Format: {audio_settings['format']}")
+            logging.info(f"  🔢 Chunk Size: {audio_settings['chunk_size']} bytes")
+            logging.info(f"  🎛️  Encoding: LINEAR16 (WAV)")
+
+            # Text Configuration
+            logging.info("📝 TEXT CONFIGURATION:")
+            logging.info(f"  📄 Input Length: {len(text)} characters")
+            logging.info(
+                f"  📝 Text Preview: '{text[:100]}{'...' if len(text) > 100 else ''}'"
+            )
+            logging.info(
+                f"  🔤 Text Type: {'Named Voice' if voice_config.name else 'Generic Voice'}"
+            )
+
+            # API Configuration
+            tts_config_full = self.config.get_tts_config()
+            logging.info("⚙️  API CONFIGURATION:")
+            logging.info(
+                f"  🎯 Voice Selection: {voice_config.name or 'Auto-select by gender'}"
+            )
+            logging.info(
+                f"  🎛️  Audio Encoding: {tts_config_full.get('audio_encoding', 'LINEAR16')}"
+            )
+            logging.info(f"  🔄 Client State: {self.state}")
+
+            logging.info("=" * 60)
+
+            # Also print to console for immediate visibility
+            print("\n" + "=" * 60)
+            print("🔊 TEXT-TO-SPEECH COMPLETE CONFIGURATION:")
+            print("=" * 60)
+
+            # Voice Configuration
+            print("🎤 VOICE CONFIGURATION:")
+            print(f"  📛 Voice Name: {voice_config.name}")
+            print(f"  🌍 Language: {voice_config.language_code}")
+            print(f"  ⚡ Speaking Rate: {voice_config.speaking_rate}x")
+            print(f"  🎵 Pitch: {voice_config.pitch} semitones")
+            print(f"  🔊 Volume Gain: +{voice_config.volume_gain_db} dB")
+
+            # Audio Configuration
+            print("🔧 AUDIO CONFIGURATION:")
+            print(f"  📊 Output Sample Rate: {audio_settings['output_sample_rate']} Hz")
+            print(f"  🎙️  Input Sample Rate: {audio_settings['sample_rate']} Hz")
+            print(f"  📻 Channels: {audio_settings['channels']}")
+            print(f"  📦 Format: {audio_settings['format']}")
+            print(f"  🔢 Chunk Size: {audio_settings['chunk_size']} bytes")
+            print(f"  🎛️  Encoding: LINEAR16 (WAV)")
+
+            # Text Configuration
+            print("📝 TEXT CONFIGURATION:")
+            print(f"  📄 Input Length: {len(text)} characters")
+            print(
+                f"  📝 Text Preview: '{text[:100]}{'...' if len(text) > 100 else ''}'"
+            )
+            print(
+                f"  🔤 Text Type: {'Named Voice' if voice_config.name else 'Generic Voice'}"
+            )
+
+            # API Configuration
+            print("⚙️  API CONFIGURATION:")
+            print(
+                f"  🎯 Voice Selection: {voice_config.name or 'Auto-select by gender'}"
+            )
+            print(
+                f"  🎛️  Audio Encoding: {tts_config_full.get('audio_encoding', 'LINEAR16')}"
+            )
+            print(f"  🔄 Client State: {self.state}")
+
+            print("=" * 60)
+
+            # Determine appropriate gender based on voice name (only for generic selection)
+            if voice_config.name:
+                # Named voice - gender is handled by the API automatically
+                ssml_gender = None  # Not used for named voices
+            else:
+                # Generic voice selection - determine gender from language/preferences
+                ssml_gender = texttospeech.SsmlVoiceGender.FEMALE  # Default preference
+
+            # Create voice selection params
+            # When using a specific voice name, don't include gender (API conflict)
+            if voice_config.name:
+                # Specific named voice - gender is already known by the API
+                voice = texttospeech.VoiceSelectionParams(
+                    language_code=voice_config.language_code,
+                    name=voice_config.name,
+                )
+            else:
+                # Generic voice selection - use gender to help select
+                voice = texttospeech.VoiceSelectionParams(
+                    language_code=voice_config.language_code,
+                    ssml_gender=ssml_gender,
+                )
 
             audio_config = texttospeech.AudioConfig(
                 audio_encoding=texttospeech.AudioEncoding.LINEAR16,
@@ -553,38 +692,93 @@ class AIProvider:
 
 
 class APIManager:
-    """Main API manager for coordinating Speech and TTS clients"""
+    """Manages API connections and conversation flow"""
 
     def __init__(self, config: APIConfig):
         self.config = config
-        self.speech_client = None
-        self.tts_client = None
-        self.ai_provider = None
+        self.speech_client: Optional[SpeechClient] = None
+        self.tts_client: Optional[TTSClient] = None
+        self.ai_provider: Optional[Any] = None
         self.state = APIState.INITIALIZING
 
-        # Initialize clients
-        self._initialize_clients()
+        # Initialize centralized audio configuration with API config data
+        from .audio_handler import audio_config_manager
 
-    def _initialize_clients(self) -> None:
-        """Initialize Speech and TTS clients"""
+        audio_config_manager.update_config(config.config_data)
+        logging.info("🔧 APIManager: Initialized centralized audio configuration")
+
+        # Initialize API clients in background
+        self._initialize_background()
+
+    def _initialize_background(self) -> None:
+        """Initialize Speech and TTS clients with non-blocking timeouts"""
+        speech_available = False
+        tts_available = False
+
+        # Check if Google Cloud should be disabled entirely
+        if os.getenv("DISABLE_GOOGLE_CLOUD", "false").lower() == "true":
+            logging.info("Google Cloud services disabled by environment variable")
+            self.speech_client = None
+            self.tts_client = None
+            self.state = APIState.AI_ONLY
+            logging.info("API Manager initialized in AI-only mode")
+            return
+
+        # Try to initialize Speech client with timeout
         try:
-            self.speech_client = SpeechClient(self.config)
-            self.tts_client = TTSClient(self.config)
+            with self._timeout(5, "Speech-to-Text client initialization"):
+                self.speech_client = SpeechClient(self.config)
+                speech_available = self.speech_client.state == APIState.READY
+        except (TimeoutError, Exception) as e:
+            logging.warning(f"Speech client initialization failed/timed out: {e}")
+            self.speech_client = None
 
-            # Check if both clients are ready
-            if (
-                self.speech_client.state == APIState.READY
-                and self.tts_client.state == APIState.READY
-            ):
-                self.state = APIState.READY
-                logging.info("API Manager initialized successfully")
-            else:
-                self.state = APIState.ERROR
-                logging.error("Failed to initialize API clients")
+        # Try to initialize TTS client with timeout
+        try:
+            with self._timeout(5, "Text-to-Speech client initialization"):
+                self.tts_client = TTSClient(self.config)
+                tts_available = self.tts_client.state == APIState.READY
+        except (TimeoutError, Exception) as e:
+            logging.warning(f"TTS client initialization failed/timed out: {e}")
+            self.tts_client = None
 
-        except Exception as e:
-            logging.error(f"Failed to initialize API Manager: {e}")
-            self.state = APIState.ERROR
+        # Determine final state based on what's available
+        if speech_available and tts_available:
+            self.state = APIState.READY
+            logging.info("API Manager fully initialized (Speech + TTS + AI)")
+        elif speech_available or tts_available:
+            self.state = APIState.AI_ONLY  # Partial functionality
+            available_services = []
+            if speech_available:
+                available_services.append("Speech")
+            if tts_available:
+                available_services.append("TTS")
+            logging.info(
+                f"API Manager partially initialized ({'+'.join(available_services)} + AI)"
+            )
+        else:
+            self.state = APIState.AI_ONLY  # AI-only mode
+            logging.info(
+                "API Manager initialized in AI-only mode (Speech/TTS unavailable)"
+            )
+
+    @contextmanager
+    def _timeout(self, seconds: int, operation_name: str):
+        """Context manager for timeout operations"""
+
+        def timeout_handler(signum, frame):
+            raise TimeoutError(f"{operation_name} timed out after {seconds} seconds")
+
+        # Set up the timeout
+        old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(seconds)
+
+        try:
+            yield
+        finally:
+            # Clean up
+            signal.alarm(0)
+            signal.signal(signal.SIGALRM, old_handler)
 
     def initialize(self) -> bool:
         """Initialize the API manager"""
@@ -593,8 +787,9 @@ class APIManager:
     def speech_to_text(self, audio_data) -> Optional[str]:
         """Convert audio to text"""
         if not self.speech_client:
+            error_msg = "❌ Speech-to-Text service unavailable: Missing Google Cloud credentials\nPlease set up GOOGLE_APPLICATION_CREDENTIALS environment variable\nSee: https://cloud.google.com/docs/authentication/external/set-up-adc"
             logging.error("Speech client not initialized")
-            return None
+            raise RuntimeError(error_msg)
 
         result = self.speech_client.transcribe_audio(audio_data)
         return result.text if result else None
@@ -602,36 +797,140 @@ class APIManager:
     def text_to_speech(self, text: str) -> Optional[Any]:
         """Convert text to audio"""
         if not self.tts_client:
+            error_msg = "❌ Text-to-Speech service unavailable: Missing Google Cloud credentials\nPlease set up GOOGLE_APPLICATION_CREDENTIALS environment variable\nSee: https://cloud.google.com/docs/authentication/external/set-up-adc"
             logging.error("TTS client not initialized")
-            return None
+            raise RuntimeError(error_msg)
 
-        return self.tts_client.synthesize_text(text)
+        # Sanitize text for TTS API (remove newlines and normalize whitespace)
+        sanitized_text = text.replace("\n", " ").replace("\r", " ")
+        sanitized_text = re.sub(r"\s+", " ", sanitized_text).strip()
+
+        if sanitized_text != text:
+            logging.debug(
+                f"🧹 TTS TEXT SANITIZED: '{text[:50]}...' → '{sanitized_text[:50]}...'"
+            )
+
+        return self.tts_client.synthesize_text(sanitized_text)
 
     def process_conversation_turn(self, audio_data) -> Optional[Any]:
         """Process a complete conversation turn: audio -> text -> AI -> audio"""
         if not self.ai_provider:
             logging.error("AI provider not set")
-            return None
+            print("\n❌ AI PROVIDER NOT SET")
+
+            # Create fallback response with user's requested message
+            from .prompts_config import PromptsConfig
+
+            fallback_audio = self.text_to_speech(
+                PromptsConfig.get_fallback_response("api_unavailable")
+            )
+            if fallback_audio:
+                logging.info("✅ Created fallback response audio (AI provider not set)")
+                print("✅ Created fallback response audio (AI provider not set)")
+                return fallback_audio
+            else:
+                logging.error(
+                    "❌ Failed to create fallback response audio (AI provider not set)"
+                )
+                print(
+                    "❌ Failed to create fallback response audio (AI provider not set)"
+                )
+                return None
+
+        logging.info("🔄 STARTING CONVERSATION PIPELINE")
+        logging.info("=" * 60)
 
         # Step 1: Speech to text
+        logging.info("STEP 1: 🎤 Speech-to-Text")
         text = self.speech_to_text(audio_data)
         if not text:
-            logging.error("Failed to transcribe audio")
+            logging.error("❌ PIPELINE FAILED: Failed to transcribe audio")
             return None
 
         # Step 2: AI processing
+        logging.info("STEP 2: 🤖 AI Processing")
+        logging.info(f"🎯 STARTING PROMPT-BASED AI PROCESSING")
+        logging.info(f"🔤 USER INPUT TO AI: '{text}'")
+        logging.info(f"📏 INPUT LENGTH: {len(text)} characters")
+        sanitized_text = None  # Initialize for scope
         try:
+            # This will trigger comprehensive prompt logging in GeminiFlashProvider
             response_text = self.ai_provider.process_text(text, {})
+            logging.info("🤖 AI RESPONSE RECEIVED:")
+            logging.info(f"📝 AI RESPONSE TEXT: '{response_text}'")
+            logging.info(f"📏 RESPONSE LENGTH: {len(response_text)} characters")
+
+            # Also print to console for immediate visibility
+            print("\n🤖 AI RESPONSE RECEIVED:")
+            print(f"📝 AI RESPONSE TEXT: '{response_text}'")
+            print(f"📏 RESPONSE LENGTH: {len(response_text)} characters")
+
+            # Sanitize AI response text for TTS (remove newlines and extra whitespace)
+            sanitized_text = response_text.replace("\n", " ").replace("\r", " ")
+            # Clean up multiple spaces
+            sanitized_text = re.sub(r"\s+", " ", sanitized_text).strip()
+
+            # Check if sanitization resulted in empty text
+            if not sanitized_text:
+                logging.warning("Sanitized text is empty, using fallback response")
+                print("⚠️ Sanitized text is empty, using fallback response")
+                from .prompts_config import PromptsConfig
+
+                sanitized_text = PromptsConfig.get_fallback_response("empty_response")
+
+            logging.info("🧹 TEXT SANITIZATION:")
+            logging.info(f"📝 ORIGINAL: '{response_text[:100]}...'")
+            logging.info(f"🧼 SANITIZED: '{sanitized_text[:100]}...'")
+            print("🧹 TEXT SANITIZED FOR TTS:")
+            print(f"📝 ORIGINAL: '{response_text[:100]}...'")
+            print(f"🧼 SANITIZED: '{sanitized_text[:100]}...'")
+
+            # Check final sanitized text length before proceeding
+            if not sanitized_text or len(sanitized_text.strip()) == 0:
+                logging.error("Final sanitized text is empty after all processing")
+                print("❌ Final sanitized text is empty after all processing")
+                from .prompts_config import PromptsConfig
+
+                sanitized_text = PromptsConfig.get_fallback_response("empty_response")
+
         except Exception as e:
-            logging.error(f"AI processing failed: {e}")
-            return None
+            logging.error(f"❌ PIPELINE FAILED: AI processing failed: {e}")
+            print(f"\n❌ AI PROCESSING FAILED: {e}")
+
+            # Create fallback response with user's requested message
+            from .prompts_config import PromptsConfig
+
+            fallback_audio = self.text_to_speech(
+                PromptsConfig.get_fallback_response("api_unavailable")
+            )
+            if fallback_audio:
+                logging.info("✅ Created fallback response audio")
+                print("✅ Created fallback response audio")
+                return fallback_audio
+            else:
+                logging.error("❌ Failed to create fallback response audio")
+                print("❌ Failed to create fallback response audio")
+                return None
 
         # Step 3: Text to speech
-        response_audio = self.text_to_speech(response_text)
+        logging.info("STEP 3: 🔊 Text-to-Speech")
+        if not sanitized_text:
+            logging.warning(
+                "❌ No sanitized text available, using final fallback for TTS"
+            )
+            print("⚠️ No sanitized text available, using final fallback for TTS")
+            from .prompts_config import PromptsConfig
+
+            sanitized_text = PromptsConfig.get_fallback_response("empty_response")
+
+        logging.info(f"🗣️  CONVERTING TO SPEECH: '{sanitized_text[:50]}...'")
+        response_audio = self.text_to_speech(sanitized_text)
         if not response_audio:
-            logging.error("Failed to synthesize response audio")
+            logging.error("❌ PIPELINE FAILED: Failed to synthesize response audio")
             return None
 
+        logging.info("✅ CONVERSATION PIPELINE COMPLETED SUCCESSFULLY")
+        logging.info("=" * 60)
         return response_audio
 
     def get_api_status(self) -> dict:

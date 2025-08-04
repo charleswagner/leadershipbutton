@@ -1,8 +1,36 @@
 # SpecPilot: AI-Powered Spec-Driven Development Framework
 
+<div style="width: 100%; text-align: center; background-color: white;">
+  <img src="specpilotheader.png" alt="AI Speed. Engineered Discipline." style="width: 400px;" />
+</div>
+
 ## Overview
 
+Let's face it. Vibe coding with AI is slow. Discipline and Rigor is required for speed. SpecPilot is your solution. AI Speed. Engineered Discipline.
+
 SpecPilot is an opinionated, AI-powered development framework that transforms how you build software by enforcing a rigorous spec-driven development methodology. It's designed to work seamlessly with Cursor IDE to provide a structured, collaborative development experience that prioritizes architecture, documentation, and systematic implementation.
+
+With SpecPilot you are 100% in control of your Project Conventions, Product Requirements, Product Roadmap, Architecture, Technical Roadmap and Implementation.
+
+SpecPilot uses a prompt and file conventions to guide your Cursors agent through consistent verification and validation of every step of the development process to make sure when AI is coding it knows what it is doing and your documentation, project conventions and architecture are always aligned.
+
+## HELPFUL CONTEXT : Some Notes about Spec Pilot and the Author
+
+I built this project in a weekend while building some software as a gift for my daughter. Vibe coding is just slow. This is much faster because the vibes are contained.
+
+My Environment
+
+- Cursor (Typically with Cloud)
+- Gemini for assistance.
+
+The environment I find works best is to use Gemini or an AI Chat Bot in a browser and do some planning and prompt development there. I then paste the prompts into cursor for further refinement or for execution. I am constantly going back and forth between the tools. Refining prompts and getting cursor to do the right thing. A few key points.
+
+- You have to be disciplined and update your project conventions, architecture and perhaps your spec diven prompt overridde to keep cursor in line.
+- When Cursor and Cloude fail I often paste issues and context into Gemini directly for help.
+- I would use Gemini in Cursor but the calls fail often for me.
+- This tool I developed makes me 10 times faster and keeps everything neat, clean and maintainable. AI can generate lots of code and i find without disciplien it creates lots of bad code.
+
+Enjoy..
 
 ## What SpecPilot Does
 

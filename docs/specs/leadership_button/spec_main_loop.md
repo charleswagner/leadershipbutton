@@ -4,6 +4,20 @@
 
 The MainLoop class serves as the central orchestrator for the Leadership Button application. It manages the complete application lifecycle, state transitions, and coordinates all components including audio handling, API interactions, and user input processing.
 
+**🎤 CRITICAL: VOICE-FIRST INTERACTION MODEL**
+
+This application is fundamentally designed as a **voice-first leadership coaching button**. The interaction model is REQUIRED to follow this exact workflow:
+
+1. **User presses spacebar** → Starts audio recording
+2. **User speaks while holding spacebar** → Records voice input
+3. **User releases spacebar** → Stops recording, sends audio to Google Cloud Speech-to-Text
+4. **Speech-to-Text processes audio** → Returns transcribed text
+5. **Text sent to Gemini AI** → AI processes leadership coaching request
+6. **Gemini returns response** → Response sent to Google Cloud Text-to-Speech
+7. **Text-to-Speech generates audio** → Audio response played back to user
+
+**NO ALTERNATIVE INTERACTION MODES**: The application must not provide text input alternatives, chat interfaces, or console-based interaction. Any failure in the voice pipeline must be handled with clear error messages directing the user to fix the underlying service (Google Cloud credentials, audio hardware, etc.).
+
 ## Core Architecture
 
 ### State Management
@@ -162,6 +176,26 @@ def on_release(self, key):
 3. **Resource Cleanup**: All resources are properly cleaned up
 4. **User Feedback**: Clear error messages are provided
 5. **Graceful Degradation**: System continues operating despite errors
+
+### Critical Service Failure Handling
+
+**🚨 GOOGLE CLOUD SERVICES UNAVAILABLE**
+
+When Google Cloud Speech-to-Text or Text-to-Speech services are unavailable (missing credentials, network issues, etc.), the application MUST:
+
+1. **Start normally** and display the standard "HOLD THE SPACEBAR TO RECORD" interface
+2. **Allow spacebar recording** to proceed normally
+3. **Detect service failure** when attempting to process audio
+4. **Display clear error message** explaining the specific missing service:
+   ```
+   ❌ Speech-to-Text service unavailable: Missing Google Cloud credentials
+   Please set up GOOGLE_APPLICATION_CREDENTIALS environment variable
+   See: https://cloud.google.com/docs/authentication/external/set-up-adc
+   ```
+5. **Return to IDLE state** and allow user to try again after fixing the issue
+6. **NEVER provide alternative interaction modes** (no text input, no console chat)
+
+**The voice-first interaction model must be maintained even when services are unavailable.**
 
 ### Error Types Handled
 

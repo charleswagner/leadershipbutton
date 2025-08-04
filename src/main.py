@@ -19,6 +19,11 @@ from typing import Optional
 
 from leadership_button.main_loop import MainLoop
 
+# Load environment variables from .env file
+from dotenv import load_dotenv
+
+load_dotenv()
+
 
 class ApplicationManager:
     """Manages the main application lifecycle and command line interface."""

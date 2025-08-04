@@ -1,58 +1,63 @@
 {
   "api_settings": {
-    "timeout_seconds": 30,
-    "retry_max_attempts": 3,
-    "retry_delay_seconds": 1.0,
-    "retry_exponential_base": 2.0,
-    "enable_logging": true,
-    "log_level": "INFO"
+    "timeout": 30,
+    "max_retries": 3,
+    "backoff_factor": 2.0
   },
   "google_cloud": {
-    "region": "us-central1",
-    "speech_to_text": {
-      "model": "latest_long",
-      "language_code": "en-US",
-      "sample_rate_hertz": 16000,
-      "channel_count": 1,
-      "enable_automatic_punctuation": true,
-      "enable_word_time_offsets": false,
-      "max_alternatives": 1,
-      "audio_encoding": "LINEAR16"
-    },
-    "text_to_speech": {
-      "voice_name": "en-US-Wavenet-D",
-      "language_code": "en-US",
-      "audio_encoding": "LINEAR16",
-      "sample_rate_hertz": 16000,
-      "speaking_rate": 1.0,
-      "pitch": 0.0,
-      "volume_gain_db": 0.0,
-      "ssml_gender": "NEUTRAL"
+    "project_id": "",
+    "credentials_path": "",
+    "region": "us-central1"
+  },
+  "gemini": {
+    "model": "gemini-1.5-flash",
+    "temperature": 0.7,
+    "max_tokens": 150,
+    "timeout": 30,
+    "safety_settings": {
+      "harassment": "BLOCK_MEDIUM_AND_ABOVE",
+      "hate_speech": "BLOCK_MEDIUM_AND_ABOVE",
+      "sexually_explicit": "BLOCK_MEDIUM_AND_ABOVE",
+      "dangerous_content": "BLOCK_MEDIUM_AND_ABOVE"
     }
   },
   "audio_settings": {
-    "input_sample_rate": 16000,
-    "output_sample_rate": 16000,
+    "sample_rate": 16000,
+    "output_sample_rate": 24000,
     "channels": 1,
     "chunk_size": 1024,
-    "max_recording_duration": 30
+    "format": "int16"
+  },
+  "speech_to_text": {
+    "language_code": "en-US",
+    "model": "latest_long",
+    "sample_rate_hertz": 16000,
+    "use_enhanced": true,
+    "enable_automatic_punctuation": true,
+    "enable_word_time_offsets": false,
+    "max_alternatives": 1
+  },
+  "text_to_speech": {
+    "language_code": "en-US",
+    "voice_name": "en-US-Wavenet-D",
+    "audio_encoding": "LINEAR16",
+    "speaking_rate": 1.25,
+    "pitch": 0.0,
+    "volume_gain_db": 8.0
   },
   "performance": {
-    "max_audio_buffer_mb": 100,
-    "concurrent_requests_limit": 3,
-    "cache_tts_responses": true,
-    "cache_duration_seconds": 3600
+    "audio_buffer_size": 4096,
+    "processing_timeout": 30,
+    "connection_timeout": 10
   },
   "features": {
-    "enable_streaming_recognition": false,
-    "enable_voice_activity_detection": false,
-    "enable_noise_reduction": false,
-    "enable_audio_preprocessing": true
+    "enable_echo_cancellation": true,
+    "enable_noise_suppression": true,
+    "enable_automatic_gain_control": true
   },
   "development": {
-    "mock_api_calls": false,
-    "save_debug_audio": false,
-    "verbose_logging": false,
-    "simulate_network_delays": false
+    "mock_apis": false,
+    "log_level": "INFO",
+    "enable_debug_audio": false
   }
 }
