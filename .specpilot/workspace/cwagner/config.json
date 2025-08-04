@@ -1,5 +1,5 @@
 {
-  "_warning": "USE CONFIG MODE ; DO NOT EDIT MANUALLY - Configuration managed by SpecPilot engine. See .specpilot/engine/spec_driven_prompt.md for available options.",
+  "_warning": "USE CONFIG MODE ; DO NOT EDIT MANUALLY - Configuration managed by SpecPilot engine.",
   "logging": {
     "verbose_mode": true,
     "notepad_summary": "one-line",

@@ -80,3 +80,6 @@ config/*credentials*
 config/*secret*
 .env
 >>>>>>> Stashed changes
+
+# Ignore user-specific SpecPilot local configuration
+.specpilot.local
