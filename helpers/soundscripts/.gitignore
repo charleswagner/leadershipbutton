@@ -1,0 +1,28 @@
+# Processing logs
+processing.log
+*.log
+
+# CSV backup files
+data/*_backup_*.csv
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+venv/
+env/
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary test files
+temp_*
+test_output_*

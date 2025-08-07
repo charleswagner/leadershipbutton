@@ -1,5 +1,7 @@
 # Audio handling dependencies
 pyaudio>=0.2.11
+librosa>=0.10.0
+numpy>=1.21.0
 
 # Google Cloud API dependencies
 google-cloud-speech>=2.0.0
