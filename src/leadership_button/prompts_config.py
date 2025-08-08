@@ -9,16 +9,18 @@ consistency and makes it easy to update coaching approaches.
 from typing import Dict, List, Any
 import os
 
-PROMPT_MD_PATH = os.path.join(
+PROMPTS_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
     "docs",
     "specs",
     "leadership_button",
-    "gemini_prompt.md",
 )
+STORY_PROMPT_PATH = os.path.join(PROMPTS_DIR, "story_prompt.md")
+ADVICE_PROMPT_PATH = os.path.join(PROMPTS_DIR, "advice_prompt.md")
+UNKNOWN_PROMPT_PATH = os.path.join(PROMPTS_DIR, "unknown_prompt.md")
 
 
-def _load_gemini_prompt_from_md(path: str) -> Dict[str, Any]:
+def _load_prompt_from_md(path: str) -> Dict[str, Any]:
     role = ""
     context = ""
     guidelines: List[str] = []
@@ -70,62 +72,18 @@ class PromptsConfig:
     of encouragement. sound ly dolly parton.
     """
 
-    # Load from markdown, then fallback to embedded defaults
-    _md = _load_gemini_prompt_from_md(PROMPT_MD_PATH)
-
-    # System prompts for Gemini AI
-    SYSTEM_PROMPTS = {
-        "leadership_coach": {
-            "role": (
-                _md.get("role")
-                or (
-                    "You are Lyra. You are speaking to Willa. Use her name in the "
-                    "response. Inspired by dolly parton you are a super fun and "
-                    "creative leadership guide, like a dance choreographer for "
-                    "friendship and fun! Your mission is to help a young artist "
-                    "discover her special leadership powers. You're teaching her "
-                    "how to be an 'Artistic Connective Strategist'—someone who "
-                    "uses creativity to bring people together and make amazing "
-                    "plans, just like planning the best craft party or composing "
-                    "a new song with friends."
-                )
-            ),
-            "context": (
-                _md.get("context")
-                or (
-                    "Context: Speak as if you are having a fun chat with a super "
-                    "creative 8-year-old leader-in-training. She's looking for "
-                    "ideas on how to handle all kinds of things an 8 year old "
-                    "goes through including relationship problems, lead group "
-                    "projects with friends, or share her artistic ideas."
-                )
-            ),
-            "response_guidelines": (
-                _md.get("guidelines")
-                or [
-                    (
-                        "Keep the total response about 20-45 seconds. 1. Start with "
-                        "a big, empathetic, Dolly-inspired greeting, and make sure "
-                        "to use a different one each time! Show you're listening "
-                        "with your whole heart. Draw inspiration from different "
-                        "styles, for example:"
-                    ),
-                    (
-                        "- Folksy & Sweet: 'Well bless your heart, that sounds like "
-                        "a pickle!' or 'Oh, honey, I hear you loud and clear.'"
-                    ),
-                    (
-                        "- Upbeat & Encouraging: 'Well howdy, superstar! Let's "
-                        "wrangle this puzzle!' or 'Wowee, what a creative challenge!'"
-                    ),
-                    (
-                        "- Straight from the Heart: 'I totally get that, let's walk "
-                        "through this together.' or 'That's a tough one, for sure, "
-                        "but we can figure it out.'"
-                    ),
-                ]
-            ),
-        }
+    # Default role/context/guidelines if files missing
+    DEFAULTS = {
+        "role": (
+            "You are Lyra, a warm and creative coach for an 8-year-old named Willa. "
+            "Be supportive and imaginative."
+        ),
+        "context": ("Keep responses age-appropriate, kind, and empowering."),
+        "guidelines": [
+            "Keep responses 20–45 seconds.",
+            "Start with an empathetic greeting (varied each time).",
+            "Be practical, positive, and creative.",
+        ],
     }
 
     # Fallback responses for various scenarios
@@ -207,16 +165,26 @@ User: {user_text}
         logging.info(f"📝 User Text: '{user_text}'")
         logging.info(f"🗂️ Context: {context}")
 
-        role = cls.SYSTEM_PROMPTS["leadership_coach"]["role"]
-        session_context = cls.SYSTEM_PROMPTS["leadership_coach"]["context"]
-        guidelines = cls.SYSTEM_PROMPTS["leadership_coach"]["response_guidelines"]
+        # Select prompt file based on intent.request
+        intent = context.get("intent", {}) if isinstance(context, dict) else {}
+        req = str(intent.get("request", "")).lower().strip()
+        if req == "story":
+            path = STORY_PROMPT_PATH
+        elif req == "advice":
+            path = ADVICE_PROMPT_PATH
+        else:
+            path = UNKNOWN_PROMPT_PATH
+
+        md = _load_prompt_from_md(path)
+        role = md.get("role") or cls.DEFAULTS["role"]
+        session_context = md.get("context") or cls.DEFAULTS["context"]
+        guidelines = md.get("guidelines") or cls.DEFAULTS["guidelines"]
 
         logging.info(f"🎭 Role Length: {len(role)} characters")
         logging.info(f"📋 Context Length: {len(session_context)} characters")
         logging.info(f"📐 Guidelines Count: {len(guidelines)} items")
 
         # Build intent block if provided
-        intent = context.get("intent", {}) if isinstance(context, dict) else {}
         request_kind = str(intent.get("request", "")).strip()
         tone = str(intent.get("tone", "")).strip()
         intent_context = str(intent.get("context", "")).strip()
