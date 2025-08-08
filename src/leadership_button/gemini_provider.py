@@ -167,6 +167,15 @@ class GeminiFlashProvider(AIProvider):
         logging.info(f"📏 FINAL PROMPT LENGTH: {len(prompt)} characters")
         logging.info(f"🎯 PROMPT PREVIEW: '{prompt[:200]}...'")
         logging.info("=" * 60)
+        # Log and print full prompt for debugging
+        logging.info("📝 FULL PROMPT — BEGIN")
+        for i, line in enumerate(prompt.split("\n"), 1):
+            logging.info("%3d: %s", i, line)
+        logging.info("📝 FULL PROMPT — END")
+        print("\n📝 FULL PROMPT — BEGIN")
+        for i, line in enumerate(prompt.split("\n"), 1):
+            print(f"{i:3d}: {line}")
+        print("📝 FULL PROMPT — END")
 
         print("✅ Generated prompt: {} characters".format(len(prompt)))
 
@@ -175,7 +184,18 @@ class GeminiFlashProvider(AIProvider):
             response = self._make_api_request(prompt)
 
             # Validate and clean the response
-            cleaned_response = self._clean_response(response)
+            raw_text = response
+            # Print and log raw AI response text
+            logging.info("📩 AI RAW RESPONSE — BEGIN")
+            for i, line in enumerate((raw_text or "").split("\n"), 1):
+                logging.info("%3d: %s", i, line)
+            logging.info("📩 AI RAW RESPONSE — END")
+            print("\n📩 AI RAW RESPONSE — BEGIN")
+            for i, line in enumerate((raw_text or "").split("\n"), 1):
+                print(f"{i:3d}: {line}")
+            print("📩 AI RAW RESPONSE — END")
+
+            cleaned_response = self._clean_response(raw_text)
 
             logging.info(
                 "Successfully processed text with Gemini Flash: %s chars -> %s chars",

@@ -59,6 +59,15 @@ class IntentAnalyzer:
         """Return dict with keys: request, tone, context, pieces (list)."""
         prompt = self.intent_prompt_template.replace("{utterance}", utterance)
         logging.info("🔎 Running intent analysis")
+        # Log and print the raw intent prompt
+        logging.info("📝 INTENT PROMPT — BEGIN")
+        for i, line in enumerate(prompt.split("\n"), 1):
+            logging.info("%3d: %s", i, line)
+        logging.info("📝 INTENT PROMPT — END")
+        print("\n📝 INTENT PROMPT — BEGIN")
+        for i, line in enumerate(prompt.split("\n"), 1):
+            print(f"{i:3d}: {line}")
+        print("📝 INTENT PROMPT — END")
         try:
             response = self.model.generate_content(
                 prompt,
@@ -69,6 +78,15 @@ class IntentAnalyzer:
                 request_options={"timeout": 20},
             )
             text = self._extract_text(response)
+            # Log and print raw LLM response text prior to JSON parsing
+            logging.info("📩 INTENT RAW RESPONSE — BEGIN")
+            for i, line in enumerate((text or "").split("\n"), 1):
+                logging.info("%3d: %s", i, line)
+            logging.info("📩 INTENT RAW RESPONSE — END")
+            print("\n📩 INTENT RAW RESPONSE — BEGIN")
+            for i, line in enumerate((text or "").split("\n"), 1):
+                print(f"{i:3d}: {line}")
+            print("📩 INTENT RAW RESPONSE — END")
             data = self._parse_json(text)
             logging.info("🧭 Intent JSON: %s", json.dumps(data, ensure_ascii=False))
             return self._normalize(data)
