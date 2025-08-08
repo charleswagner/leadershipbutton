@@ -7,6 +7,49 @@ consistency and makes it easy to update coaching approaches.
 """
 
 from typing import Dict, List, Any
+import os
+
+PROMPT_MD_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+    "docs",
+    "specs",
+    "leadership_button",
+    "gemini_prompt.md",
+)
+
+
+def _load_gemini_prompt_from_md(path: str) -> Dict[str, Any]:
+    role = ""
+    context = ""
+    guidelines: List[str] = []
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            section = None
+            for raw in f:
+                line = raw.rstrip("\n")
+                if line.startswith("## "):
+                    title = line[3:].strip().lower()
+                    if "role" in title:
+                        section = "role"
+                    elif "context" in title:
+                        section = "context"
+                    elif "response guidelines" in title or "guidelines" in title:
+                        section = "guidelines"
+                    else:
+                        section = None
+                    continue
+                if section == "role":
+                    role += line + " "
+                elif section == "context":
+                    context += line + " "
+                elif section == "guidelines":
+                    if line.strip().startswith("-"):
+                        guidelines.append(line.strip().lstrip("- "))
+        role = role.strip()
+        context = context.strip()
+    except Exception:
+        pass
+    return {"role": role, "context": context, "guidelines": guidelines}
 
 
 class PromptsConfig:
@@ -27,25 +70,70 @@ class PromptsConfig:
     of encouragement. sound ly dolly parton.
     """
 
+    # Load from markdown, then fallback to embedded defaults
+    _md = _load_gemini_prompt_from_md(PROMPT_MD_PATH)
+
     # System prompts for Gemini AI
     SYSTEM_PROMPTS = {
         "leadership_coach": {
             "role": (
-                "You are Lyra. You are speaking to Willa. Use can her name in the response.  Inspired by dolly parton you are a super fun and creative leadership guide, like a dance choreographer for friendship and fun! Your mission is to help a young artist discover her special leadership powers. You're teaching her how to be an 'Artistic Connective Strategist'—someone who uses creativity to bring people together and make amazing plans, just like planning the best craft party or composing a new song with friends."
+                _md.get("role")
+                or (
+                    "You are Lyra. You are speaking to Willa. Use her name in the "
+                    "response. Inspired by dolly parton you are a super fun and "
+                    "creative leadership guide, like a dance choreographer for "
+                    "friendship and fun! Your mission is to help a young artist "
+                    "discover her special leadership powers. You're teaching her "
+                    "how to be an 'Artistic Connective Strategist'—someone who "
+                    "uses creativity to bring people together and make amazing "
+                    "plans, just like planning the best craft party or composing "
+                    "a new song with friends."
+                )
             ),
-            "context": "Context: Speak as if you are having a fun chat with a super creative 8-year-old leader-in-training. She's looking for ideas on how to handle all kinds of things an 8 year old goes through including relationship problems, lead group projects with friends, or share her artistic ideas.",
-            "response_guidelines": [
-                "Keep the total response about 20-45 seconds. 1. Start with a big, empathetic, Dolly-inspired greeting, and make sure to use a different one each time! Show you're listening with your whole heart. Draw inspiration from different styles, for example:",
-                "- Folksy & Sweet: 'Well bless your heart, that sounds like a pickle!' or 'Oh, honey, I hear you loud and clear.'",
-                "- Upbeat & Encouraging: 'Well howdy, superstar! Let's wrangle this puzzle!' or 'Wowee, what a creative challenge!'",
-                "- Straight from the Heart: 'I totally get that. Let's walk through this together.' or 'That's a tough one, for sure, but we can figure it out.'",
-            ],
+            "context": (
+                _md.get("context")
+                or (
+                    "Context: Speak as if you are having a fun chat with a super "
+                    "creative 8-year-old leader-in-training. She's looking for "
+                    "ideas on how to handle all kinds of things an 8 year old "
+                    "goes through including relationship problems, lead group "
+                    "projects with friends, or share her artistic ideas."
+                )
+            ),
+            "response_guidelines": (
+                _md.get("guidelines")
+                or [
+                    (
+                        "Keep the total response about 20-45 seconds. 1. Start with "
+                        "a big, empathetic, Dolly-inspired greeting, and make sure "
+                        "to use a different one each time! Show you're listening "
+                        "with your whole heart. Draw inspiration from different "
+                        "styles, for example:"
+                    ),
+                    (
+                        "- Folksy & Sweet: 'Well bless your heart, that sounds like "
+                        "a pickle!' or 'Oh, honey, I hear you loud and clear.'"
+                    ),
+                    (
+                        "- Upbeat & Encouraging: 'Well howdy, superstar! Let's "
+                        "wrangle this puzzle!' or 'Wowee, what a creative challenge!'"
+                    ),
+                    (
+                        "- Straight from the Heart: 'I totally get that, let's walk "
+                        "through this together.' or 'That's a tough one, for sure, "
+                        "but we can figure it out.'"
+                    ),
+                ]
+            ),
         }
     }
 
     # Fallback responses for various scenarios
     FALLBACK_RESPONSES = {
-        "empty_input": "I didn't catch that. Could you please repeat your question about leadership?",
+        "empty_input": (
+            "I didn't catch that. Could you please repeat your question about "
+            "leadership?"
+        ),
         "connection_error": (
             "I'm having trouble connecting to my AI systems right now. "
             "Let me suggest this: Great leaders focus on listening actively, "
@@ -53,17 +141,27 @@ class PromptsConfig:
             "What specific leadership challenge would you like to discuss?"
         ),
         "safety_blocked": (
-            "I want to make sure our conversation stays focused on leadership development. "
-            "Could you rephrase your question about leadership or management?"
+            "I want to make sure our conversation stays focused on leadership "
+            "development. Could you rephrase your question about leadership or "
+            "management?"
         ),
-        "empty_response": "Sorry I didn't get that, could you share again?",
-        "general_help": "I'm here to help with your leadership development. What would you like to discuss?",
-        "api_unavailable": "Sorry I didn't understand can you press the button and share with me again?",
+        "empty_response": ("Sorry I didn't get that, could you share again?"),
+        "general_help": (
+            "I'm here to help with your leadership development. What would you "
+            "like to discuss?"
+        ),
+        "api_unavailable": (
+            "Sorry I didn't understand can you press the button and share with "
+            "me again?"
+        ),
     }
 
     # Mock AI responses for development/testing
     MOCK_RESPONSES = {
-        "fallback_template": "Mock response - You said: {text}. This is a fallback while AI integration is being set up.",
+        "fallback_template": (
+            "Mock response - You said: {text}. This is a fallback while AI "
+            "integration is being set up."
+        ),
         "provider_name": "Mock AI Provider (Fallback)",
     }
 
@@ -134,7 +232,7 @@ User: {user_text}
                 history_text += f"User: {exchange.get('user', '')}\n"
                 history_text += f"Coach: {exchange.get('assistant', '')}\n"
 
-            logging.info(f"📚 Using WITH HISTORY template")
+            logging.info("📚 Using WITH HISTORY template")
             logging.info(f"📜 History Length: {len(history_text)} characters")
             logging.info(f"📊 History Exchanges: {len(history)} total, using last 2")
 
@@ -153,7 +251,7 @@ User: {user_text}
             )
             return final_prompt
         else:
-            logging.info(f"📚 Using BASE template (no history)")
+            logging.info("📚 Using BASE template (no history)")
 
             final_prompt = cls.PROMPT_TEMPLATES["leadership_coaching"][
                 "base_template"
