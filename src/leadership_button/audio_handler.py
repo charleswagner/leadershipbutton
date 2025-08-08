@@ -192,7 +192,7 @@ class AudioConfigManager:
                 self._config_data["recording_format"] = audio_settings["format"]
                 self._config_data["playback_format"] = audio_settings["format"]
 
-            logging.info(f"🔧 AudioConfigManager: Updated from API config")
+            logging.info("🔧 AudioConfigManager: Updated from API config")
             logging.info(
                 f"   📊 Recording: {self._config_data['recording_sample_rate']} Hz"
             )
@@ -416,7 +416,8 @@ class AudioHandler:
             playback_sample_rate = playback_config["sample_rate"]
             channels = playback_config["channels"]
             logging.info(
-                f"🔊 PLAYBACK: Using centralized config sample rate: {playback_sample_rate} Hz (raw bytes)"
+                "🔊 PLAYBACK: Using centralized config sample rate: %s Hz (raw bytes)",
+                playback_sample_rate,
             )
 
         with self.state_lock:
@@ -468,7 +469,8 @@ class AudioHandler:
                 if self.stop_playback_event.is_set():
                     break
 
-                chunk = audio_data[i : i + chunk_size]
+                end = i + chunk_size
+                chunk = audio_data[i:end]
                 playback_stream.write(chunk)
 
             logging.info("Audio playback completed")
@@ -486,6 +488,18 @@ class AudioHandler:
                     logging.error(f"Error closing playback stream: {e}")
 
             # Reset state
+            with self.state_lock:
+                if self.state == DeviceState.PLAYING:
+                    self.state = DeviceState.IDLE
+
+    def stop_playback(self) -> None:
+        """Public method to stop any ongoing playback immediately."""
+        try:
+            self.stop_playback_event.set()
+            # Wait briefly for playback thread to exit
+            if self.playback_thread and self.playback_thread.is_alive():
+                self.playback_thread.join(timeout=1.0)
+        finally:
             with self.state_lock:
                 if self.state == DeviceState.PLAYING:
                     self.state = DeviceState.IDLE

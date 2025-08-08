@@ -19,7 +19,7 @@ from pynput import keyboard
 # Assuming these modules exist and are structured as per the specs
 # These will be placeholder imports if the actual files don't exist yet
 from .api_client import APIManager, APIConfig
-from .audio_handler import AudioHandler, AudioConfig
+from .audio_handler import AudioHandler
 from .audio_playback import AudioPlaybackManager
 
 
@@ -94,10 +94,9 @@ class MainLoop:
             self.logger.info("API client initialized")
 
             # Initialize audio handler for microphone recording
-            from .audio_handler import AudioConfig, AudioHandler
+            from .audio_handler import AudioHandler
 
-            audio_config = AudioConfig(config.config_data)
-            self.audio_handler = AudioHandler(audio_config)
+            self.audio_handler = AudioHandler(config.config_data)
             self.logger.info("Audio handler initialized for microphone recording")
 
             # Initialize audio playback manager with centralized config
@@ -225,6 +224,20 @@ class MainLoop:
             if not self.spacebar_pressed_event.is_set():
                 self.spacebar_pressed_event.set()
                 if self.current_state == ApplicationState.IDLE:
+                    self._handle_spacebar_press()
+                elif self.current_state == ApplicationState.SPEAKING:
+                    # Interrupt playback and start a new recording immediately
+                    try:
+                        if (
+                            self.playback_manager
+                            and self.playback_manager.audio_handler
+                        ):
+                            self.playback_manager.audio_handler.stop_playback()
+                            self.logger.info("⏹️ Playback interrupted by user")
+                    except Exception as exc:
+                        self.logger.warning(f"Failed to stop playback: {exc}")
+                    # Transition to recording
+                    self._transition_state(ApplicationState.IDLE)
                     self._handle_spacebar_press()
 
     def on_release(self, key):
