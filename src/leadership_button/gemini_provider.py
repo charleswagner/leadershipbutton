@@ -7,6 +7,7 @@ architecture by requiring API keys to be stored in .env files.
 """
 
 import logging
+import json
 import os
 from typing import Dict, Optional, Any
 from tenacity import (
@@ -152,6 +153,13 @@ class GeminiFlashProvider(AIProvider):
             # Shallow copy to avoid side effects
             context = dict(context or {})
             context["intent"] = intent
+            try:
+                logging.info(
+                    "🧭 Intent Analysis (provider): %s",
+                    json.dumps(intent, ensure_ascii=False),
+                )
+            except Exception:
+                logging.info("🧭 Intent Analysis (provider): %s", intent)
         prompt = PromptsConfig.get_leadership_prompt(text, context)
 
         # 🔍 LOG GENERATED PROMPT DETAILS

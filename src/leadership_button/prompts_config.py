@@ -274,6 +274,11 @@ User: {user_text}
                 response_instructions=response_instructions,
             )
 
+            logging.info("📝 FINAL PROMPT (with history) — BEGIN")
+            for i, line in enumerate(final_prompt.split("\n"), 1):
+                logging.info("%3d: %s", i, line)
+            logging.info("📝 FINAL PROMPT (with history) — END")
+
             logging.info(
                 f"✅ FINAL PROMPT CONSTRUCTED (with history): {len(final_prompt)} characters"
             )
@@ -291,6 +296,11 @@ User: {user_text}
                 user_text=user_text,
                 response_instructions=response_instructions,
             )
+
+            logging.info("📝 FINAL PROMPT (base) — BEGIN")
+            for i, line in enumerate(final_prompt.split("\n"), 1):
+                logging.info("%3d: %s", i, line)
+            logging.info("📝 FINAL PROMPT (base) — END")
 
             logging.info(
                 f"✅ FINAL PROMPT CONSTRUCTED (base): {len(final_prompt)} characters"
