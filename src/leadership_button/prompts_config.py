@@ -193,7 +193,9 @@ User: {user_text}
 
         Args:
             user_text: The user's input text
-            context: Additional conversation context (history, user_name, etc.)
+            context: Additional conversation context (history, user_name, etc.).
+                Optionally include an 'intent' dict with keys: request, tone,
+                context (one sentence), and pieces (list of {name, description}).
 
         Returns:
             Formatted prompt for leadership coaching
@@ -212,6 +214,30 @@ User: {user_text}
         logging.info(f"🎭 Role Length: {len(role)} characters")
         logging.info(f"📋 Context Length: {len(session_context)} characters")
         logging.info(f"📐 Guidelines Count: {len(guidelines)} items")
+
+        # Build intent block if provided
+        intent = context.get("intent", {}) if isinstance(context, dict) else {}
+        request_kind = str(intent.get("request", "")).strip()
+        tone = str(intent.get("tone", "")).strip()
+        intent_context = str(intent.get("context", "")).strip()
+        pieces = intent.get("pieces", []) or []
+        pieces_lines: List[str] = []
+        for p in pieces[:8]:  # cap for safety
+            name = str(p.get("name", "")).strip()
+            desc = str(p.get("description", "")).strip()
+            if name:
+                line = f"- {name}: {desc}" if desc else f"- {name}"
+                pieces_lines.append(line)
+        intent_block_parts: List[str] = []
+        if request_kind:
+            intent_block_parts.append(f"Request: {request_kind}")
+        if tone:
+            intent_block_parts.append(f"Tone: {tone}")
+        if intent_context:
+            intent_block_parts.append(f"Context: {intent_context}")
+        if pieces_lines:
+            intent_block_parts.append("Pieces:\n" + "\n".join(pieces_lines))
+        intent_block = "\n".join(intent_block_parts)
 
         # Format response instructions
         response_instructions = (
@@ -240,7 +266,9 @@ User: {user_text}
                 "with_history_template"
             ].format(
                 role=role,
-                context=session_context,
+                context=(
+                    session_context + ("\n\n" + intent_block if intent_block else "")
+                ),
                 conversation_history=history_text.strip(),
                 user_text=user_text,
                 response_instructions=response_instructions,
@@ -257,7 +285,9 @@ User: {user_text}
                 "base_template"
             ].format(
                 role=role,
-                context=session_context,
+                context=(
+                    session_context + ("\n\n" + intent_block if intent_block else "")
+                ),
                 user_text=user_text,
                 response_instructions=response_instructions,
             )

@@ -19,6 +19,7 @@ from tenacity import (
 # Import the AIProvider interface from api_client
 from .api_client import AIProvider
 from .prompts_config import PromptsConfig
+from .intent_analyzer import IntentAnalyzer
 
 # Gemini AI dependencies
 try:
@@ -88,6 +89,13 @@ class GeminiFlashProvider(AIProvider):
             self._is_available = False
             raise RuntimeError(f"Failed to initialize Gemini model: {e}")
 
+        # Intent analyzer
+        try:
+            self.intent_analyzer = IntentAnalyzer(model=self.model_name)
+        except Exception as exc:
+            logging.warning("Intent analyzer unavailable: %s", exc)
+            self.intent_analyzer = None
+
         # Safety settings for leadership coaching context
         self.safety_settings = {
             HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
@@ -132,11 +140,18 @@ class GeminiFlashProvider(AIProvider):
         logging.info(f"📋 CONTEXT KEYS: {list(context.keys()) if context else 'None'}")
 
         # Also print to console
-        print(f"\n🎯 GENERATING PROMPT:")
+        print("\n🎯 GENERATING PROMPT:")
         print(f"📝 User: '{text[:100]}{'...' if len(text) > 100 else ''}'")
         print(f"🗂️ Context: {list(context.keys()) if context else 'None'}")
 
         # Create leadership coaching prompt using centralized config
+        intent = None
+        if self.intent_analyzer:
+            intent = self.intent_analyzer.analyze(text)
+        if intent:
+            # Shallow copy to avoid side effects
+            context = dict(context or {})
+            context["intent"] = intent
         prompt = PromptsConfig.get_leadership_prompt(text, context)
 
         # 🔍 LOG GENERATED PROMPT DETAILS
@@ -155,7 +170,9 @@ class GeminiFlashProvider(AIProvider):
             cleaned_response = self._clean_response(response)
 
             logging.info(
-                f"Successfully processed text with Gemini Flash: {len(text)} chars -> {len(cleaned_response)} chars"
+                "Successfully processed text with Gemini Flash: %s chars -> %s chars",
+                len(text),
+                len(cleaned_response),
             )
             return cleaned_response
 
@@ -206,7 +223,12 @@ class GeminiFlashProvider(AIProvider):
         # Also print to console for immediate visibility
         print("\n🤖 SENDING TO GEMINI:")
         print(
-            f"📝 Prompt: {len(prompt)} chars | Guidelines: Empathy {'✓' if has_empathy else '✗'} | Missions {'✓' if has_missions else '✗'} | Sparkle {'✓' if has_sparkle else '✗'}"
+            "📝 Prompt: {} chars | Guidelines: Empathy {} | Missions {} | Sparkle {}".format(
+                len(prompt),
+                "✓" if has_empathy else "✗",
+                "✓" if has_missions else "✗",
+                "✓" if has_sparkle else "✗",
+            )
         )
 
         try:
@@ -292,7 +314,9 @@ class GeminiFlashProvider(AIProvider):
         )
 
         logging.info(
-            f"Gemini Flash provider configured: temp={self.temperature}, max_tokens={self.max_tokens}"
+            "Gemini Flash provider configured: temp=%s, max_tokens=%s",
+            self.temperature,
+            self.max_tokens,
         )
 
     def get_model_info(self) -> Dict[str, Any]:
