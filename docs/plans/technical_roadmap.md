@@ -104,9 +104,47 @@ This document outlines the technical implementation plan for The Leadership Butt
 - [x] Robust state transitions
 - [x] User experience optimization
 
-## Phase 3: Hardware Integration (Raspberry Pi) 📋
+## Phase 3: Kit.txt Integration 📋
 
-### 3.1 Conversational Features
+### 3.1 Kit.txt Parser Implementation
+
+- [ ] Implement kit.txt parser with format validation
+- [ ] Add duration parsing for multiple formats (MM:SS, HH:MM:SS, seconds)
+- [ ] Create data validation framework for kit entries
+- [ ] Add comprehensive error handling for malformed data
+- [ ] Write unit tests for parser functionality
+- [ ] Implement flexible parsing with validation
+
+### 3.2 Metadata Merging Functionality
+
+- [ ] Implement metadata merging with existing CSV data
+- [ ] Add new kit metadata columns to CSV structure
+- [ ] Create filename matching logic for kit entries
+- [ ] Handle data conflicts and missing data gracefully
+- [ ] Integrate with existing CSV manager
+- [ ] Maintain backward compatibility with existing format
+
+### 3.3 Data Validation & Quality Assurance
+
+- [ ] Implement comprehensive validation rules for kit data
+- [ ] Add quality metrics tracking (match rate, completeness)
+- [ ] Create error reporting and logging system
+- [ ] Implement performance monitoring for kit processing
+- [ ] Add data integrity validation during merging
+- [ ] Create quality assessment framework
+
+### 3.4 System Integration
+
+- [ ] Integrate kit processing into main audio workflow
+- [ ] Add resume functionality for kit data processing
+- [ ] Implement batch processing support for kit files
+- [ ] Add comprehensive logging for kit operations
+- [ ] Create integration tests for complete workflow
+- [ ] Implement graceful handling of missing kit files
+
+## Phase 4: Hardware Integration (Raspberry Pi) 📋
+
+### 4.1 Conversational Features
 
 - [ ] Implement Firestore integration for conversation storage
 - [ ] Design conversation data model
@@ -117,7 +155,7 @@ This document outlines the technical implementation plan for The Leadership Butt
 - [ ] Implement context management across sessions
 - [ ] Add comprehensive testing for conversation features
 
-### 3.2 Multi-User Support
+### 4.2 Multi-User Support
 
 - [ ] Design multi-user architecture
 - [ ] Implement user identification system
@@ -128,7 +166,7 @@ This document outlines the technical implementation plan for The Leadership Butt
 - [ ] Add user analytics and insights
 - [ ] Comprehensive testing for multi-user scenarios
 
-### 3.3 Input System Abstraction
+### 4.3 Input System Abstraction
 
 - [ ] Design abstract InputProvider interface
 - [ ] Implement spacebar input adapter
@@ -138,7 +176,7 @@ This document outlines the technical implementation plan for The Leadership Butt
 - [ ] Add input mode persistence
 - [ ] Create input testing framework
 
-### 3.4 Spacebar Input Enhancement
+### 4.4 Spacebar Input Enhancement
 
 - [ ] Improve spacebar handling with enhanced pynput integration
 - [ ] Add debouncing and filtering for noise reduction
@@ -146,7 +184,7 @@ This document outlines the technical implementation plan for The Leadership Butt
 - [ ] Add configuration options for spacebar behavior
 - [ ] Implement comprehensive spacebar testing
 
-### 3.5 Button Input Preparation
+### 4.5 Button Input Preparation
 
 - [ ] Design button interface for physical hardware
 - [ ] Implement GPIO abstraction for hardware-agnostic handling
@@ -154,7 +192,7 @@ This document outlines the technical implementation plan for The Leadership Butt
 - [ ] Create button configuration system
 - [ ] Implement comprehensive button testing
 
-### 3.6 Input Mode Management
+### 4.6 Input Mode Management
 
 - [ ] Implement automatic detection of available input methods
 - [ ] Add manual override for user control
@@ -162,14 +200,14 @@ This document outlines the technical implementation plan for The Leadership Butt
 - [ ] Add status indicators for current input mode
 - [ ] Implement seamless mode switching
 
-### 3.7 Input Testing and Quality
+### 4.7 Input Testing and Quality
 
 - [ ] Create comprehensive testing for all input scenarios
 - [ ] Implement mock input providers for testing
 - [ ] Add performance benchmarks for input responsiveness
 - [ ] Create error scenario testing for robust validation
 
-### 3.8 Physical Button Integration
+### 4.8 Physical Button Integration
 
 - [ ] Design and implement hardware button interface
 - [ ] Ensure high-quality, responsive button hardware
@@ -177,7 +215,7 @@ This document outlines the technical implementation plan for The Leadership Butt
 - [ ] Implement durable, long-lasting button design
 - [ ] Create comprehensive hardware testing
 
-### 3.9 LED Status Indicators
+### 4.9 LED Status Indicators
 
 - [ ] Design visual feedback system with LED indicators
 - [ ] Implement status patterns for clear communication
@@ -185,7 +223,7 @@ This document outlines the technical implementation plan for The Leadership Butt
 - [ ] Create color coding for different states
 - [ ] Optimize for power efficiency
 
-### 3.10 Input Mode Toggle System
+### 4.10 Input Mode Toggle System
 
 - [ ] Implement automatic switching between input methods
 - [ ] Add manual override for user control
@@ -193,7 +231,7 @@ This document outlines the technical implementation plan for The Leadership Butt
 - [ ] Implement mode persistence for preferences
 - [ ] Add mode status display
 
-### 3.11 Power Management
+### 4.11 Power Management
 
 - [ ] Implement battery monitoring with real-time indication
 - [ ] Add power optimization for extended operation

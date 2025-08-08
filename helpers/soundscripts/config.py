@@ -73,6 +73,11 @@ CSV_HEADERS = [
     "google_cloud_url",
     "source_directory",
     "processing_timestamp",
+    # Kit.txt enrichment columns
+    "kit_title",
+    "kit_category",
+    "kit_tags",
+    "kit_description",
 ]
 
 # Librosa analysis parameters

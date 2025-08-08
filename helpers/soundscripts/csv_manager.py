@@ -288,3 +288,121 @@ class CSVManager:
                     return False
 
         return True
+
+    def add_kit_columns_if_missing(self, csv_path: str) -> bool:
+        """Ensure kit columns exist in the CSV header; rewrite file if missing.
+
+        Returns True if file structure is OK or was updated successfully.
+        """
+        required_kit_columns = [
+            "kit_title",
+            "kit_category",
+            "kit_tags",
+            "kit_description",
+        ]
+
+        if not os.path.exists(csv_path):
+            self.logger.error(f"CSV file does not exist: {csv_path}")
+            return False
+
+        try:
+            with open(csv_path, "r", newline="", encoding="utf-8") as infile:
+                reader = csv.DictReader(infile)
+                existing_headers = reader.fieldnames or []
+
+            # If already present, nothing to do
+            if all(col in existing_headers for col in required_kit_columns):
+                return True
+
+            # Build new header preserving order, appending missing kit columns at end
+            new_headers = list(existing_headers)
+            for col in required_kit_columns:
+                if col not in new_headers:
+                    new_headers.append(col)
+
+            temp_path = csv_path + ".tmp"
+            with open(csv_path, "r", newline="", encoding="utf-8") as infile, open(
+                temp_path, "w", newline="", encoding="utf-8"
+            ) as outfile:
+                reader = csv.DictReader(infile)
+                writer = csv.DictWriter(outfile, fieldnames=new_headers)
+                writer.writeheader()
+                for row in reader:
+                    for col in required_kit_columns:
+                        row.setdefault(col, "")
+                    writer.writerow(row)
+
+            os.replace(temp_path, csv_path)
+            self.logger.info("CSV header updated with kit columns")
+            return True
+        except Exception as exc:
+            self.logger.error(f"Failed to add kit columns: {exc}")
+            return False
+
+    def merge_kit_data(self, csv_path: str, kit_entries: List[Dict[str, str]]) -> int:
+        """Merge kit metadata into CSV rows by filename.
+
+        kit_entries: list of dict-like entries with keys: filename, title, category, tags, description
+        Returns the number of rows updated.
+        """
+        if not os.path.exists(csv_path):
+            self.logger.error(f"CSV file does not exist: {csv_path}")
+            return 0
+
+        # Build lookup from kit entries by normalized filename
+        def norm(name: str) -> str:
+            base = os.path.basename(name).strip().lower()
+            return base
+
+        lookup: Dict[str, Dict[str, str]] = {}
+        for e in kit_entries:
+            try:
+                key = norm(e["filename"])  # type: ignore[index]
+                lookup[key] = e  # last one wins
+            except Exception:
+                continue
+
+        updated = 0
+        temp_path = csv_path + ".tmp"
+        try:
+            with open(csv_path, "r", newline="", encoding="utf-8") as infile, open(
+                temp_path, "w", newline="", encoding="utf-8"
+            ) as outfile:
+                reader = csv.DictReader(infile)
+                # Ensure kit columns present in writer
+                headers = reader.fieldnames or self.headers
+                for col in ["kit_title", "kit_category", "kit_tags", "kit_description"]:
+                    if col not in headers:
+                        headers.append(col)
+                writer = csv.DictWriter(outfile, fieldnames=headers)
+                writer.writeheader()
+
+                for row in reader:
+                    filename = row.get("filename", "")
+                    match = lookup.get(norm(filename))
+                    if match:
+                        row["kit_title"] = match.get("title", "")  # type: ignore[attr-defined]
+                        row["kit_category"] = match.get("category", "")  # type: ignore[attr-defined]
+                        row["kit_tags"] = match.get("tags", "")  # type: ignore[attr-defined]
+                        row["kit_description"] = match.get("description", "")  # type: ignore[attr-defined]
+                        updated += 1
+                    else:
+                        # Ensure empty fields exist
+                        row.setdefault("kit_title", "")
+                        row.setdefault("kit_category", "")
+                        row.setdefault("kit_tags", "")
+                        row.setdefault("kit_description", "")
+
+                    writer.writerow(row)
+
+            os.replace(temp_path, csv_path)
+            self.logger.info(f"Merged kit metadata into CSV rows: {updated} updates")
+            return updated
+        except Exception as exc:
+            self.logger.error(f"Failed to merge kit data: {exc}")
+            try:
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+            except Exception:
+                pass
+            return 0

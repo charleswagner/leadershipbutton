@@ -1,299 +1,321 @@
+#!/usr/bin/env python3
 """
 Kit.txt processor for Mixkit metadata integration.
+
+Implements robust parsing of pipe-delimited kit.txt files, duration
+format handling, entry validation, and basic processing statistics.
 """
+from __future__ import annotations
 
 import os
 import logging
-import csv
-from typing import List, Dict, Any, Optional
-from utils import load_json_file, save_json_file, get_timestamp
+from dataclasses import dataclass
+from typing import Dict, Any, List, Optional
+
+
+@dataclass
+class KitEntry:
+    """Represents a single kit.txt entry."""
+
+    filename: str
+    title: str
+    category: str
+    duration: float
+    tags: str
+    description: str
+    raw_line: str
+    line_number: int
 
 
 class KitProcessor:
-    """Process Mixkit metadata from kit.txt file."""
+    """Parses and validates Mixkit kit.txt files.
 
-    def __init__(self):
-        """Initialize the kit processor."""
+    Responsibilities:
+    - Parse pipe-delimited lines from a kit.txt file
+    - Convert duration strings into seconds (float)
+    - Validate required fields and basic constraints
+    - Collect simple processing statistics
+    """
+
+    def __init__(self, config: Optional[Dict[str, Any]] = None) -> None:
+        self.config: Dict[str, Any] = config or {}
         self.logger = logging.getLogger(__name__)
+        # Default to INFO if no configuration provided by caller
+        if not self.logger.handlers:
+            logging.basicConfig(level=logging.INFO)
 
-    def parse_kit_file(self, kit_path: str) -> List[Dict[str, Any]]:
-        """Parse kit.txt file and extract metadata."""
+        self.stats: Dict[str, int] = {
+            "total_lines": 0,
+            "parsed_entries": 0,
+            "valid_entries": 0,
+            "invalid_entries": 0,  # structural/format issues
+            "parse_errors": 0,
+            "validation_errors": 0,
+        }
 
-        if not os.path.exists(kit_path):
-            self.logger.warning(f"Kit file does not exist: {kit_path}")
+    def parse_kit_file(self, kit_file_path: str) -> List[KitEntry]:
+        """Parse a kit.txt file and return a list of validated KitEntry objects.
+
+        Lines starting with '#' or blank lines are ignored.
+        Only entries that pass validation are returned.
+        """
+        if not os.path.exists(kit_file_path):
+            self.logger.warning("Kit file not found: %s", kit_file_path)
             return []
 
-        kit_data = []
-
+        entries: List[KitEntry] = []
         try:
-            with open(kit_path, "r", encoding="utf-8") as f:
-                for line_num, line in enumerate(f, 1):
-                    line = line.strip()
+            with open(kit_file_path, "r", encoding="utf-8") as file_handle:
+                for line_number, raw_line in enumerate(file_handle, start=1):
+                    self.stats["total_lines"] += 1
+                    line = raw_line.strip()
                     if not line or line.startswith("#"):
                         continue
 
-                    entry = self._parse_kit_line(line, line_num)
-                    if entry:
-                        kit_data.append(entry)
+                    try:
+                        entry = self._parse_line(line=line, line_number=line_number)
+                        if entry is None:
+                            self.stats["invalid_entries"] += 1
+                            continue
+                        self.stats["parsed_entries"] += 1
 
-            self.logger.info(f"Parsed {len(kit_data)} entries from kit.txt")
-            return kit_data
-
-        except Exception as e:
-            self.logger.error(f"Failed to parse kit file {kit_path}: {e}")
+                        if self.validate_kit_entry(entry):
+                            entries.append(entry)
+                            self.stats["valid_entries"] += 1
+                        else:
+                            self.stats["validation_errors"] += 1
+                    except Exception as exc:  # noqa: BLE001 - surface parsing issues to logs
+                        self.logger.error(
+                            "Error parsing line %d: %s | content='%s'",
+                            line_number,
+                            exc,
+                            line,
+                        )
+                        self.stats["parse_errors"] += 1
+        except OSError as exc:
+            self.logger.error("Failed to read kit file '%s': %s", kit_file_path, exc)
             return []
 
-    def _parse_kit_line(self, line: str, line_num: int) -> Optional[Dict[str, Any]]:
-        """Parse a single line from kit.txt."""
+        self.logger.info("Parsed %d valid entries from %s", len(entries), kit_file_path)
+        return entries
+
+    def parse_mixkit_catalog(self, kit_file_path: str) -> List[KitEntry]:
+        """Parse Mixkit catalog-style kit.txt where entries are blocks like:
+        Title\nby Artist\n\nTag1\nTag2\nTag3\nMM:SS\nDownload Free Music
+
+        Returns entries without filenames; filename matching will be performed downstream.
+        """
+        if not os.path.exists(kit_file_path):
+            self.logger.warning("Kit file not found: %s", kit_file_path)
+            return []
+
+        def is_duration_line(text: str) -> bool:
+            t = text.strip()
+            if not t:
+                return False
+            return (
+                t.replace(":", "").isdigit() and (t.count(":") in (1, 2))
+            )
+
+        entries: List[KitEntry] = []
+        block: List[str] = []
 
         try:
-            # Expected format: filename|title|category|duration|tags|description
-            parts = line.split("|")
+            with open(kit_file_path, "r", encoding="utf-8") as fh:
+                for raw in fh:
+                    line = raw.strip()
+                    if line == "Download Free Music":
+                        # finalize current block
+                        if block:
+                            entry = self._parse_mixkit_block(block)
+                            if entry:
+                                entries.append(entry)
+                            block = []
+                        continue
 
-            if len(parts) < 4:
-                self.logger.warning(f"Invalid kit line {line_num}: insufficient parts")
-                return None
+                    if line:
+                        block.append(line)
 
-            entry = {
-                "filename": parts[0].strip(),
-                "title": parts[1].strip() if len(parts) > 1 else "",
-                "category": parts[2].strip() if len(parts) > 2 else "",
-                "duration": (
-                    self._parse_duration(parts[3].strip()) if len(parts) > 3 else 0.0
-                ),
-                "tags": (
-                    parts[4].strip().split(",")
-                    if len(parts) > 4 and parts[4].strip()
-                    else []
-                ),
-                "description": parts[5].strip() if len(parts) > 5 else "",
-                "line_number": line_num,
-                "source": "kit.txt",
-            }
+                # flush last block if any
+                if block:
+                    entry = self._parse_mixkit_block(block)
+                    if entry:
+                        entries.append(entry)
+        except OSError as exc:
+            self.logger.error("Failed to read kit file '%s': %s", kit_file_path, exc)
+            return []
 
-            # Validate entry
-            if self.validate_kit_entry(entry):
-                return entry
-            else:
-                self.logger.warning(
-                    f"Invalid kit entry at line {line_num}: {entry['filename']}"
-                )
-                return None
+        self.logger.info("Parsed %d entries from Mixkit catalog format", len(entries))
+        return entries
 
-        except Exception as e:
-            self.logger.error(f"Failed to parse kit line {line_num}: {e}")
+    def _parse_line(self, line: str, line_number: int) -> Optional[KitEntry]:
+        """Parse a single line from kit.txt file into a KitEntry or None if invalid."""
+        parts = [part.strip() for part in line.split("|")]
+        if len(parts) != 6:
+            self.logger.warning(
+                "Invalid format at line %d: expected 6 parts, got %d", line_number, len(parts)
+            )
             return None
 
-    def _parse_duration(self, duration_str: str) -> float:
-        """Parse duration string to float seconds."""
+        filename, title, category, duration_str, tags, description = parts
 
-        try:
-            # Handle various duration formats
-            duration_str = duration_str.lower().strip()
+        duration_seconds = self.parse_duration(duration_str)
 
-            if ":" in duration_str:
-                # Format: MM:SS or HH:MM:SS
-                parts = duration_str.split(":")
-                if len(parts) == 2:
-                    minutes, seconds = map(float, parts)
-                    return minutes * 60 + seconds
-                elif len(parts) == 3:
-                    hours, minutes, seconds = map(float, parts)
-                    return hours * 3600 + minutes * 60 + seconds
-            else:
-                # Try direct float conversion
-                return float(duration_str)
+        return KitEntry(
+            filename=filename,
+            title=title,
+            category=category,
+            duration=duration_seconds,
+            tags=tags,
+            description=description,
+            raw_line=line,
+            line_number=line_number,
+        )
 
-        except (ValueError, TypeError):
-            return 0.0
+    def _parse_mixkit_block(self, lines: List[str]) -> Optional[KitEntry]:
+        """Parse a single Mixkit block into a KitEntry without filename."""
+        if not lines:
+            return None
 
-    def validate_kit_entry(self, entry: Dict[str, Any]) -> bool:
-        """Validate kit entry for completeness and correctness."""
+        # Expect first line is title
+        title = lines[0].strip()
+        # Find artist line starting with 'by '
+        artist = ""
+        tags: List[str] = []
+        duration_str = ""
 
-        # Check required fields
-        if not entry.get("filename"):
+        idx = 1
+        while idx < len(lines):
+            line = lines[idx].strip()
+            if line.lower().startswith("by "):
+                artist = line[3:].strip()
+                idx += 1
+                break
+            idx += 1
+
+        # Collect tags until duration
+        while idx < len(lines):
+            line = lines[idx].strip()
+            if line and (":" in line) and self._looks_like_timecode(line):
+                duration_str = line
+                idx += 1
+                break
+            if line and not line.lower().startswith("by "):
+                tags.append(line)
+            idx += 1
+
+        # Use first tag as category if available
+        category = tags[0] if tags else ""
+        tags_csv = ",".join(tags)
+
+        # Fallback duration if missing
+        duration = 0.0
+        if duration_str:
+            try:
+                duration = self.parse_duration(duration_str)
+            except Exception:
+                duration = 0.0
+
+        # Build description from artist and tags
+        description_parts = []
+        if artist:
+            description_parts.append(f"Artist: {artist}")
+        if tags:
+            description_parts.append(f"Tags: {tags_csv}")
+        description = " | ".join(description_parts)
+
+        entry = KitEntry(
+            filename="",  # unknown at this stage
+            title=title,
+            category=category,
+            duration=duration if duration > 0 else 0.001,  # ensure positive
+            tags=tags_csv,
+            description=description,
+            raw_line="; ".join(lines[:6]),
+            line_number=0,
+        )
+        return entry
+
+    def _looks_like_timecode(self, text: str) -> bool:
+        t = text.strip()
+        if not t or ":" not in t:
+            return False
+        parts = t.split(":")
+        return all(p.isdigit() for p in parts)
+
+    def parse_duration(self, duration_str: str) -> float:
+        """Parse duration into seconds.
+
+        Supported formats:
+        - SS or SS.sss (e.g., "2.3", "45")
+        - MM:SS (e.g., "3:45")
+        - HH:MM:SS (e.g., "1:15:30")
+        """
+        token = duration_str.strip()
+        if ":" not in token:
+            # Seconds format (may include decimals)
+            value = float(token)
+            if value < 0:
+                raise ValueError("Duration seconds must be non-negative")
+            return value
+
+        parts = token.split(":")
+        if len(parts) == 2:
+            minutes, seconds = parts
+            m = int(minutes)
+            s = int(seconds)
+            if m < 0 or s < 0 or s >= 60:
+                raise ValueError(f"Invalid MM:SS format: {token}")
+            return float(m * 60 + s)
+
+        if len(parts) == 3:
+            hours, minutes, seconds = parts
+            h = int(hours)
+            m = int(minutes)
+            s = int(seconds)
+            if h < 0 or m < 0 or m >= 60 or s < 0 or s >= 60:
+                raise ValueError(f"Invalid HH:MM:SS format: {token}")
+            return float(h * 3600 + m * 60 + s)
+
+        raise ValueError(f"Unsupported duration format: {token}")
+
+    def validate_kit_entry(self, entry: KitEntry) -> bool:
+        """Validate KitEntry fields according to basic constraints."""
+        max_desc_len: int = int(self.config.get("max_description_length", 1000))
+
+        if not entry.filename or not entry.filename.strip():
+            self.logger.warning("Validation error: filename is required")
+            return False
+        if not entry.title or not entry.title.strip():
+            self.logger.warning("Validation error: title is required")
+            return False
+        if not entry.category or not entry.category.strip():
+            self.logger.warning("Validation error: category is required")
+            return False
+        if entry.duration <= 0:
+            self.logger.warning("Validation error: duration must be positive")
+            return False
+        if len(entry.description) > max_desc_len:
+            self.logger.warning("Validation error: description too long (max %d)", max_desc_len)
             return False
 
-        # Validate duration
-        duration = entry.get("duration", 0)
-        if not isinstance(duration, (int, float)) or duration < 0:
+        # Basic filename character validation
+        invalid_chars = '<>:"/\\|?*'
+        if any(char in entry.filename for char in invalid_chars):
+            self.logger.warning("Validation error: filename contains invalid characters")
             return False
 
-        # Validate tags is a list
-        if not isinstance(entry.get("tags", []), list):
-            return False
+        # Basic tag normalization check (comma-separated list)
+        if entry.tags:
+            tag_list = [tag.strip() for tag in entry.tags.split(",") if tag.strip()]
+            if len(tag_list) > 0 and any(
+                not tag or "," in tag for tag in tag_list
+            ):
+                self.logger.warning("Validation error: tags must be comma-separated tokens")
+                return False
 
         return True
 
-    def merge_kit_metadata(self, csv_path: str, kit_path: str) -> bool:
-        """Merge kit.txt metadata with existing CSV data."""
-
-        if not os.path.exists(csv_path):
-            self.logger.error(f"CSV file does not exist: {csv_path}")
-            return False
-
-        # Parse kit data
-        kit_data = self.parse_kit_file(kit_path)
-        if not kit_data:
-            self.logger.warning("No kit data to merge")
-            return True  # Not an error, just no data
-
-        # Create kit data lookup
-        kit_lookup = {entry["filename"]: entry for entry in kit_data}
-
-        # Read existing CSV and merge
-        try:
-            temp_csv_path = csv_path + ".tmp"
-
-            with open(csv_path, "r", newline="", encoding="utf-8") as infile, open(
-                temp_csv_path, "w", newline="", encoding="utf-8"
-            ) as outfile:
-
-                reader = csv.DictReader(infile)
-                fieldnames = reader.fieldnames + [
-                    "kit_title",
-                    "kit_category",
-                    "kit_tags",
-                    "kit_description",
-                ]
-                writer = csv.DictWriter(outfile, fieldnames=fieldnames)
-                writer.writeheader()
-
-                merged_count = 0
-                for row in reader:
-                    filename = row.get("filename", "")
-
-                    # Check if we have kit data for this file
-                    if filename in kit_lookup:
-                        kit_entry = kit_lookup[filename]
-                        row["kit_title"] = kit_entry.get("title", "")
-                        row["kit_category"] = kit_entry.get("category", "")
-                        row["kit_tags"] = "|".join(kit_entry.get("tags", []))
-                        row["kit_description"] = kit_entry.get("description", "")
-                        merged_count += 1
-                    else:
-                        row["kit_title"] = ""
-                        row["kit_category"] = ""
-                        row["kit_tags"] = ""
-                        row["kit_description"] = ""
-
-                    writer.writerow(row)
-
-            # Replace original file
-            os.replace(temp_csv_path, csv_path)
-
-            self.logger.info(
-                f"Successfully merged kit metadata: {merged_count} entries updated"
-            )
-            return True
-
-        except Exception as e:
-            self.logger.error(f"Failed to merge kit metadata: {e}")
-            # Clean up temp file if it exists
-            if os.path.exists(temp_csv_path):
-                os.remove(temp_csv_path)
-            return False
-
-    def get_kit_statistics(self, kit_path: str) -> Dict[str, Any]:
-        """Get statistics about kit.txt file."""
-
-        if not os.path.exists(kit_path):
-            return {"error": "File does not exist"}
-
-        kit_data = self.parse_kit_file(kit_path)
-
-        stats = {
-            "total_entries": len(kit_data),
-            "valid_entries": 0,
-            "invalid_entries": 0,
-            "categories": {},
-            "duration_stats": {
-                "min": float("inf"),
-                "max": 0.0,
-                "total": 0.0,
-                "count": 0,
-            },
-            "files_with_tags": 0,
-            "files_with_descriptions": 0,
-        }
-
-        for entry in kit_data:
-            if self.validate_kit_entry(entry):
-                stats["valid_entries"] += 1
-
-                # Category statistics
-                category = entry.get("category", "unknown")
-                stats["categories"][category] = stats["categories"].get(category, 0) + 1
-
-                # Duration statistics
-                duration = entry.get("duration", 0)
-                if duration > 0:
-                    stats["duration_stats"]["min"] = min(
-                        stats["duration_stats"]["min"], duration
-                    )
-                    stats["duration_stats"]["max"] = max(
-                        stats["duration_stats"]["max"], duration
-                    )
-                    stats["duration_stats"]["total"] += duration
-                    stats["duration_stats"]["count"] += 1
-
-                # Tag and description statistics
-                if entry.get("tags"):
-                    stats["files_with_tags"] += 1
-                if entry.get("description"):
-                    stats["files_with_descriptions"] += 1
-            else:
-                stats["invalid_entries"] += 1
-
-        # Calculate average duration
-        if stats["duration_stats"]["count"] > 0:
-            stats["duration_stats"]["average"] = (
-                stats["duration_stats"]["total"] / stats["duration_stats"]["count"]
-            )
-        else:
-            stats["duration_stats"]["average"] = 0.0
-
-        # Handle edge case for min duration
-        if stats["duration_stats"]["min"] == float("inf"):
-            stats["duration_stats"]["min"] = 0.0
-
-        return stats
-
-    def export_kit_data(
-        self, kit_path: str, output_path: str, format: str = "json"
-    ) -> bool:
-        """Export kit data to different formats."""
-
-        kit_data = self.parse_kit_file(kit_path)
-        if not kit_data:
-            self.logger.warning("No kit data to export")
-            return False
-
-        try:
-            if format.lower() == "json":
-                return save_json_file(
-                    output_path,
-                    {
-                        "metadata": {
-                            "source": kit_path,
-                            "export_timestamp": get_timestamp(),
-                            "total_entries": len(kit_data),
-                        },
-                        "entries": kit_data,
-                    },
-                )
-            elif format.lower() == "csv":
-                with open(output_path, "w", newline="", encoding="utf-8") as csvfile:
-                    if kit_data:
-                        fieldnames = kit_data[0].keys()
-                        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-                        writer.writeheader()
-                        writer.writerows(kit_data)
-                return True
-            else:
-                self.logger.error(f"Unsupported export format: {format}")
-                return False
-
-        except Exception as e:
-            self.logger.error(f"Failed to export kit data: {e}")
-            return False
+    def get_kit_statistics(self) -> Dict[str, int]:
+        """Return a shallow copy of processing statistics."""
+        return dict(self.stats)

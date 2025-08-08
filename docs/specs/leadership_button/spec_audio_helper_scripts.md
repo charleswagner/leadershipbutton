@@ -392,14 +392,7 @@ def resume_processing(csv_path: str, source_dirs: List[str]) -> List[str]:
 3. Test with small sample from each directory
 4. Validate CSV output format
 
-### Phase 3: Kit.txt Integration
-
-1. Implement kit.txt parser
-2. Add metadata merging functionality
-3. Test with actual kit.txt file
-4. Validate merged data integrity
-
-### Phase 4: Full Processing
+### Phase 3: Full Processing
 
 1. Process complete directories
 2. Implement error recovery

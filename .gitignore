@@ -83,3 +83,12 @@ config/*secret*
 
 # Ignore user-specific SpecPilot local configuration
 .specpilot.local
+
+# Audio helper logs and artifacts
+helpers/soundscripts/processing.log
+helpers/soundscripts/data/*_backup_*.csv
+helpers/soundscripts/data/test_*.txt
+helpers/soundscripts/test_kit_parser.py
+
+# SpecPilot user logs
+.specpilot/workspace/cwagner/logs/

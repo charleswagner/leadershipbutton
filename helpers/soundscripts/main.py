@@ -81,6 +81,36 @@ class AudioProcessor:
 
             if not unprocessed_files:
                 self.logger.info("✅ No new files to process")
+                # Still process kit.txt metadata if available
+                if os.path.exists(self.config.kit_file_path):
+                                    self.logger.info("📝 Processing kit.txt metadata")
+                kit_entries = self.kit_processor.parse_kit_file(self.config.kit_file_path)
+                if not kit_entries:
+                    self.logger.info("No pipe-delimited entries found; trying Mixkit catalog parser")
+                    kit_entries = self.kit_processor.parse_mixkit_catalog(self.config.kit_file_path)
+                # Convert KitEntry objects to simple dicts for CSVManager (allow missing filename initially)
+                kit_dicts = [
+                    {
+                        "filename": e.filename,
+                        "title": e.title,
+                        "category": e.category,
+                        "tags": e.tags,
+                        "description": e.description,
+                    }
+                    for e in kit_entries
+                ]
+                # Infer filenames from CSV for Mixkit catalog entries if needed
+                if kit_dicts and any(not d.get("filename") for d in kit_dicts):
+                    self._infer_filenames_for_mixkit(kit_dicts)
+                # Keep only entries with a resolved filename
+                kit_dicts = [d for d in kit_dicts if d.get("filename")]
+                # Ensure header has kit columns, then merge
+                self.csv_manager.add_kit_columns_if_missing(self.config.csv_output_path)
+                updated = self.csv_manager.merge_kit_data(self.config.csv_output_path, kit_dicts)
+                self.logger.info(f"🧩 Kit metadata merged into CSV rows: {updated} updates")
+                # Log final stats before exiting
+                self.stats["end_time"] = get_timestamp()
+                self._log_final_statistics()
                 return True
 
             # Step 5: Process files in batches
@@ -92,9 +122,29 @@ class AudioProcessor:
             # Step 6: Process kit.txt metadata if available
             if os.path.exists(self.config.kit_file_path):
                 self.logger.info("📝 Processing kit.txt metadata")
-                self.kit_processor.merge_kit_metadata(
-                    self.config.csv_output_path, self.config.kit_file_path
-                )
+                kit_entries = self.kit_processor.parse_kit_file(self.config.kit_file_path)
+                if not kit_entries:
+                    self.logger.info("No pipe-delimited entries found; trying Mixkit catalog parser")
+                    kit_entries = self.kit_processor.parse_mixkit_catalog(self.config.kit_file_path)
+                # Convert KitEntry objects to simple dicts for CSVManager
+                kit_dicts = [
+                    {
+                        "filename": e.filename,
+                        "title": e.title,
+                        "category": e.category,
+                        "tags": e.tags,
+                        "description": e.description,
+                    }
+                    for e in kit_entries
+                    if self.kit_processor.validate_kit_entry(e)
+                ]
+                # Try filename inference for mixkit entries (title-based matching)
+                if kit_dicts and any(not d.get("filename") for d in kit_dicts):
+                    self._infer_filenames_for_mixkit(kit_dicts)
+                # Ensure header has kit columns, then merge
+                self.csv_manager.add_kit_columns_if_missing(self.config.csv_output_path)
+                updated = self.csv_manager.merge_kit_data(self.config.csv_output_path, kit_dicts)
+                self.logger.info(f"🧩 Kit metadata merged into CSV rows: {updated} updates")
 
             # Step 7: Generate final statistics
             self.stats["end_time"] = get_timestamp()
@@ -244,6 +294,46 @@ class AudioProcessor:
             self.logger.info(
                 f"   Source directories: {csv_stats['source_directories']}"
             )
+
+    def _infer_filenames_for_mixkit(self, kit_entries: List[Dict[str, Any]]) -> None:
+        """Infer filenames in CSV for mixkit entries by matching title to mixkit rows.
+        Strategy: for rows with source_directory == 'mixkit', compare normalized title substrings
+        against filename; fill kit dict filename to the matching filename.
+        """
+        import re
+        try:
+            with open(self.config.csv_output_path, "r", newline="", encoding="utf-8") as csvfile:
+                import csv
+                reader = csv.DictReader(csvfile)
+                mixkit_files = []
+                for row in reader:
+                    if (row.get("source_directory", "").lower() == "mixkit") and row.get("filename"):
+                        mixkit_files.append(row["filename"]) 
+        except Exception:
+            mixkit_files = []
+
+        def norm_text(t: str) -> str:
+            t = t.lower()
+            t = re.sub(r"[^a-z0-9]+", " ", t)
+            return " ".join(t.split())
+
+        norm_map = {f: norm_text(os.path.splitext(os.path.basename(f))[0]) for f in mixkit_files}
+
+        for d in kit_entries:
+            if d.get("filename"):
+                continue
+            title = d.get("title", "")
+            if not title:
+                continue
+            nt = norm_text(title)
+            # find best contains match
+            best = None
+            for fname, nbase in norm_map.items():
+                if nt and (nt in nbase or nbase in nt):
+                    best = fname
+                    break
+            if best:
+                d["filename"] = best
 
 
 def create_parser() -> argparse.ArgumentParser:
