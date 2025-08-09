@@ -13,6 +13,7 @@ It handles all the format conversion and playback logic in one place.
 import logging
 import time
 from typing import Optional, Any
+import threading
 from pathlib import Path
 
 from .audio_handler import AudioHandler, AudioConfig, AudioData, audio_config_manager
@@ -102,7 +103,10 @@ class AudioPlaybackManager:
             return False
 
     def play_audio_and_wait(
-        self, audio_response: Any, description: str = "audio"
+        self,
+        audio_response: Any,
+        description: str = "audio",
+        stop_event: Optional[threading.Event] = None,
     ) -> bool:
         """
         Play audio and wait for completion.
@@ -119,27 +123,19 @@ class AudioPlaybackManager:
             if not self.play_audio_response(audio_response, description):
                 return False
 
-            # Wait for completion with timeout (90 seconds max for full audio)
+            # Wait for completion with no forced timeout; rely on stop_event or natural completion
             self.logger.info(f"⏱️  Waiting for {description} playback to complete...")
-            timeout_seconds = 90.0
-            elapsed = 0.0
             sleep_interval = 0.1
 
-            while self.audio_handler.is_playing() and elapsed < timeout_seconds:
+            while self.audio_handler.is_playing():
+                # If a stop event is provided and set, interrupt playback
+                if stop_event is not None and stop_event.is_set():
+                    try:
+                        self.audio_handler.stop_playback()
+                    except Exception:
+                        pass
+                    break
                 time.sleep(sleep_interval)
-                elapsed += sleep_interval
-
-            if elapsed >= timeout_seconds:
-                self.logger.warning(
-                    f"⚠️  {description} playback timeout after "
-                    f"{timeout_seconds}s - forcing stop"
-                )
-                # Try to stop the audio
-                try:
-                    self.audio_handler.stop_playback()
-                except Exception:
-                    pass
-                return False
 
             self.logger.info(f"✅ {description} playback completed")
             return True
@@ -290,6 +286,14 @@ class AudioPlaybackManager:
         if self.audio_handler:
             self.audio_handler.cleanup()
 
+    def stop_playback(self) -> None:
+        """Immediately stop any active playback."""
+        try:
+            if self.audio_handler:
+                self.audio_handler.stop_playback()
+        except Exception:
+            pass
+
 
 # Convenience functions for easy use
 def play_audio(audio_response: Any, description: str = "audio") -> bool:
@@ -310,7 +314,11 @@ def play_audio(audio_response: Any, description: str = "audio") -> bool:
         manager.cleanup()
 
 
-def play_audio_and_wait(audio_response: Any, description: str = "audio") -> bool:
+def play_audio_and_wait(
+    audio_response: Any,
+    description: str = "audio",
+    stop_event: Optional[threading.Event] = None,
+) -> bool:
     """
     Convenience function to play audio and wait for completion.
 
@@ -323,7 +331,7 @@ def play_audio_and_wait(audio_response: Any, description: str = "audio") -> bool
     """
     manager = AudioPlaybackManager()
     try:
-        return manager.play_audio_and_wait(audio_response, description)
+        return manager.play_audio_and_wait(audio_response, description, stop_event)
     finally:
         manager.cleanup()
 

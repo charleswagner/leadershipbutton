@@ -1,0 +1,12 @@
+{
+  "input": {
+    "ssml": "<speak><par><media><speak>This is the ground truth test.</speak></media><media><seq><audio src='https://storage.googleapis.com/cwsounds/mixkit/mixkit-happy-spring-535.mp3'/></seq></media></par></speak>"
+  },
+  "voice": {
+    "languageCode": "en-US",
+    "name": "en-US-Wavenet-D"
+  },
+  "audioConfig": {
+    "audioEncoding": "MP3"
+  }
+}

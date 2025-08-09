@@ -1,0 +1,13 @@
+<speak>
+  <p>Final test with the original public file.</p>
+  <par>
+    <media>
+      <speak>This test uses the happy spring audio.</speak>
+    </media>
+    <media>
+      <seq>
+        <audio src="https://storage.googleapis.com/cwsounds/mixkit/mixkit-happy-spring-535.mp3"/>
+      </seq>
+    </media>
+  </par>
+</speak>

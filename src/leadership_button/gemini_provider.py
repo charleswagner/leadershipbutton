@@ -76,7 +76,8 @@ class GeminiFlashProvider(AIProvider):
         self.config = config or {}
         self.model_name = self.config.get("model", "gemini-1.5-flash")
         self.temperature = self.config.get("temperature", 0.7)
-        self.max_tokens = self.config.get("max_tokens", 150)
+        # No explicit token limit; allow model defaults
+        self.max_tokens = None
         self.timeout = self.config.get("timeout", 30)
 
         # Initialize the model
@@ -114,7 +115,6 @@ class GeminiFlashProvider(AIProvider):
         # Generation configuration
         self.generation_config = genai.types.GenerationConfig(
             temperature=self.temperature,
-            max_output_tokens=self.max_tokens,
         )
 
     def process_text(self, text: str, context: Dict[str, Any]) -> str:
@@ -168,20 +168,17 @@ class GeminiFlashProvider(AIProvider):
                 logging.info("🧭 Intent Analysis (provider): %s", intent)
             # Generate sound suggestions and inject
             try:
-                if self.suggester:
-                    suggestions = self.suggester.suggest(intent, limit=20)
-                    context["sound_suggestions"] = suggestions
+                # Prefer curated top-100 list if available
+                top100 = self._load_kid_top100()
+                if top100:
+                    context["sound_suggestions"] = top100
                     logging.info(
-                        "🎹 Top sound suggestions (count=%d)", len(suggestions)
+                        "🎹 Loaded curated top-100 sound list (count=%d)", len(top100)
                     )
-                    for s in suggestions:
-                        logging.info(
-                            "   🎵 %s | %s | %s | tags: %s",
-                            s.get("filename", ""),
-                            s.get("display_title", ""),
-                            s.get("url", ""),
-                            (s.get("tags", "").split(",")[0] or "").strip(),
-                        )
+                elif self.suggester:
+                    suggestions = self.suggester.suggest(intent, limit=100)
+                    context["sound_suggestions"] = suggestions
+                    logging.info("🎹 Dynamic suggestions (count=%d)", len(suggestions))
             except Exception as exc:
                 logging.warning("Sound suggestions failed: %s", exc)
         prompt = PromptsConfig.get_leadership_prompt(text, context)
@@ -274,16 +271,13 @@ class GeminiFlashProvider(AIProvider):
 
         # Also print to console for immediate visibility
         print("\n🤖 SENDING TO GEMINI:")
-        print(
-            "📝 Prompt: {} chars | Guidelines: Empathy {} | Missions {} | Sparkle {}".format(
-                len(prompt),
-                "✓" if has_empathy else "✗",
-                "✓" if has_missions else "✗",
-                "✓" if has_sparkle else "✗",
-            )
-        )
+        print("📝 Prompt Length:", len(prompt))
+        print("📝 Prompt (full) — BEGIN")
+        print(prompt)
+        print("📝 Prompt (full) — END")
 
         try:
+            # Do not set max_output_tokens; allow model to output fully
             response = self.model.generate_content(
                 prompt,
                 generation_config=self.generation_config,
@@ -322,19 +316,9 @@ class GeminiFlashProvider(AIProvider):
         if not response:
             return PromptsConfig.get_fallback_response("empty_response")
 
-        # Remove any potential markdown formatting
-        cleaned = response.strip()
+        # Remove any potential markdown formatting but DO NOT truncate
+        cleaned = (response or "").strip()
         cleaned = cleaned.replace("**", "").replace("*", "")
-
-        # Optional: Limit to 5000 characters if response is extremely long
-        if len(cleaned) > 5000:
-            logging.info(f"Response truncated from {len(cleaned)} to 5000 characters")
-            cleaned = cleaned[:5000]
-            # Find a good breaking point to avoid cutting mid-sentence
-            last_period = cleaned.rfind(". ")
-            if last_period > 4000:  # Only truncate at period if it's not too early
-                cleaned = cleaned[: last_period + 1]
-
         return cleaned
 
     def get_provider_name(self) -> str:
@@ -354,15 +338,15 @@ class GeminiFlashProvider(AIProvider):
         """
         if "temperature" in settings:
             self.temperature = float(settings["temperature"])
+        # Ignore explicit max_tokens to avoid truncation per user preference
         if "max_tokens" in settings:
-            self.max_tokens = int(settings["max_tokens"])
+            self.max_tokens = None
         if "timeout" in settings:
             self.timeout = int(settings["timeout"])
 
         # Update generation config
         self.generation_config = genai.types.GenerationConfig(
             temperature=self.temperature,
-            max_output_tokens=self.max_tokens,
         )
 
         logging.info(
@@ -386,3 +370,42 @@ class GeminiFlashProvider(AIProvider):
             "timeout": self.timeout,
             "available": self.is_available(),
         }
+
+    def _load_kid_top100(self):
+        import csv
+        from pathlib import Path
+
+        p = Path("tmp/top100_kid_story_audio.csv")
+        if not p.exists():
+            return []
+        out = []
+        try:
+            with p.open("r", encoding="utf-8") as f:
+                r = csv.DictReader(f)
+                for row in r:
+                    # Build suggestion dict
+                    title = row.get("title", "")
+                    typ = (row.get("type", "") or "").lower()
+                    try:
+                        dur = float(row.get("duration_seconds", 0) or 0)
+                    except Exception:
+                        dur = 0.0
+                    rel = row.get("relpath", "") or ""
+                    url = row.get("url", "") or ""
+                    out.append(
+                        {
+                            "display_title": title,
+                            "type": typ if typ in ("music", "sfx") else "sfx",
+                            "duration": dur,
+                            "category": row.get("category", "") or "",
+                            "tags": row.get("tags", "") or "",
+                            "filename": rel.split("/")[-1] if rel else title,
+                            "url": url,
+                        }
+                    )
+        except Exception as exc:
+            import logging
+
+            logging.warning("Failed to load top100 list: %s", exc)
+            return []
+        return out

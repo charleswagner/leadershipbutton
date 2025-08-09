@@ -1,58 +1,104 @@
-# LeadershipButton
+# Leadership Button
 
-(A brief, one-sentence description of what the LeadershipButton project does will go here.)
+AI-powered leadership coach with voice input/output.
 
-### ✨ Spec-Driven Development
+## Install (from source)
 
-This project is built using a **Spec-Driven Development** methodology, orchestrated by the `specpilot` framework. All new functionality must begin as a detailed markdown **specification file** located in the `docs/specs/` directory.
-
-This approach ensures that every feature is well-defined, testable, and aligned with our goals before any code is written. The spec is the source of truth.
-
-### 📂 Project Structure
-
-We enforce a strict separation of concerns between the **application code** (`src`, `tests`) and the **project artifacts** (`docs`). The entire process is orchestrated by the `specpilot` framework, which is embedded in its own directory with a clean, organized structure.
-
-```
-.
-├── .specpilot/                    # The embedded framework engine
-│   ├── engine/                    # Core framework files
-│   │   ├── spec_driven_prompt.md  # Master protocol (AI assistant "constitution")
-│   │   └── bootstrap_py.md        # Development environment setup guide
-│   ├── config/                # Project-specific overrides
-│   │   ├── config.json        # (Optional) Project config override
-│   │   └── spec_driven_prompt_override.md # (Optional) Project prompt override
-│   ├── notepads/              # Developer notes
-│   │   └── notepad.md         # Developer scratchpad and notes
-│   └── logs/                  # Runtime logs
-│       ├── specpilot.log      # Milestone log (high-level progress)
-│       └── specpilot_verbose.log # Verbose log (complete transcripts)
-├── docs/                          # Project documentation
-│   ├── plans/                     # Project planning documents
-│   ├── specs/                     # Feature specifications
-│   └── project_conventions.md     # Development standards
-├── src/                           # Application source code
-└── tests/                         # Automated tests
+```bash
+python -m pip install --upgrade build
+python -m build
+pip install dist/leadershipbutton-*.whl
 ```
 
-### 🔧 Framework Components
+## CLI
 
-**Engine Files** (`.specpilot/engine/`): The core "brain" of the framework
+```bash
+leadershipbutton
+```
 
-- **`spec_driven_prompt.md`**: Master protocol defining AI assistant behavior, modes, and rules
-- **`bootstrap_py.md`**: Complete setup guide for new development environments
+## Google Cloud credentials
 
-**Configuration Override** (`.specpilot/workspace/config/`): Project-specific overrides
+We DO NOT ship credentials in the package. Create a service account with access to Text-to-Speech and Speech-to-Text, download its JSON key, and set:
 
-- **`config.json`**: Project-specific configuration that overrides defaults
-- **`spec_driven_prompt_override.md`**: Project-specific prompt rules that take precedence
+```bash
+export GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/to/key.json
+export GOOGLE_CLOUD_PROJECT=your-project-id
+```
 
-**Workspace** (`.specpilot/workspace/`): Runtime files that change during development
+You can also put these in a `.env` file at the project root; the app loads it automatically in development.
 
-- **`notepads/notepad.md`**: Persistent developer scratchpad for notes and ideas
-- **`logs/`**: Development audit trail and conversation history
+## Configuration
 
-**Configuration** (`.specpilot/engine/config_default.json`): Default framework settings
+Edit `config/api_config.json` (and `config/api_config.development.json` for dev overrides). Notable fields:
 
-- Controls logging behavior and commit intelligence features
-- **Commit Configuration**: Customize commit analysis, scoring, and intelligence features
-- **Log Analysis**: Framework automatically analyzes `.specpilot/workspace/logs/` for commit intelligence
+- `text_to_speech.language_code` (e.g., `en-US`)
+- `text_to_speech.voice_name` (e.g., `en-US-Neural2-H`)
+- `audio_settings` sample rates/channels
+
+## Packaging notes
+
+- Packaging is via `pyproject.toml` (setuptools). Runtime data included: `config/*.json`, CSV metadata, and prompt specs.
+- Audio libraries or private keys are not packaged.
+
+## Optional helpers
+
+- `scripts/generate_voice_samples.py` – builds short samples for each voice (requires credentials)
+- `scripts/play_files_from_stdin.py` – play a list of files from stdin
+
+## Bundle and deploy to Raspberry Pi
+
+Prerequisites on the Pi (the deploy script installs these automatically if possible):
+
+- Debian/Raspberry Pi OS with systemd and apt
+- Network access over SSH (e.g., `cwagner@pi.local`)
+
+Steps (from your Mac on the project root):
+
+```bash
+# Build the package
+python3 -m pip install --upgrade build
+python3 -m build
+
+# Deploy (will scp the wheel, set up venv, install deps, and create a systemd service)
+bash scripts/deploy_to_pi.sh --host cwagner@pi.local --env .env
+```
+
+Optional flags:
+
+- `--dest /home/pi/leadershipbutton` – change install directory
+- `--key-file /absolute/path/key.json` – also copy a Google key to the Pi and set GOOGLE_APPLICATION_CREDENTIALS
+- `--no-sudo` – if your user has the needed permissions
+
+What the script does:
+
+- Builds the wheel `dist/leadershipbutton-*.whl`
+- Copies `.whl` and `.env` (if present) to the Pi
+- Installs system dependencies (PortAudio, ffmpeg, build tools)
+- Creates venv at `<dest>/.venv` and installs the wheel
+- Creates and enables systemd service `leadershipbutton.service` to run at boot
+- Starts the service immediately
+
+Start/stop/status on the Pi:
+
+```bash
+ssh cwagner@pi.local 'sudo systemctl start leadershipbutton.service'
+ssh cwagner@pi.local 'sudo systemctl stop leadershipbutton.service'
+ssh cwagner@pi.local 'systemctl status leadershipbutton.service --no-pager'
+```
+
+Tail logs:
+
+```bash
+ssh cwagner@pi.local 'journalctl -u leadershipbutton.service -f'
+```
+
+Troubleshooting:
+
+- apt/dpkg lock: another package manager is running on the Pi. The deploy script now waits, but if you see a lock error:
+  ```bash
+  ssh cwagner@pi.local
+  sudo dpkg --configure -a
+  sudo apt-get -o Dpkg::Lock::Timeout=600 -y -f install
+  sudo apt-get -o Dpkg::Lock::Timeout=600 update -y
+  ```
+- Credentials: ensure `.env` on the Pi contains `GOOGLE_APPLICATION_CREDENTIALS` and `GOOGLE_CLOUD_PROJECT`, or deploy with `--key-file`.

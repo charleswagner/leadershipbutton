@@ -1,0 +1,4 @@
+include README.md
+recursive-include config *.json
+recursive-include helpers/soundscripts/data *.csv
+recursive-include docs/specs *.md

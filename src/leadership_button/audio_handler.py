@@ -281,6 +281,13 @@ class AudioHandler:
             logging.error("PyAudio not available for recording")
             return False
 
+        # If audio is currently playing, stop it immediately so recording can begin
+        try:
+            if self.is_playing():
+                self.stop_playback()
+        except Exception:
+            pass
+
         with self.state_lock:
             if self.state != DeviceState.IDLE:
                 logging.warning(f"Cannot start recording in state: {self.state}")
@@ -451,6 +458,7 @@ class AudioHandler:
 
     def _play_audio_stream(self, audio_data: bytes, sample_rate: int, channels: int):
         """Internal method for audio playback"""
+        # Use instance attribute so other threads can force-stop the stream
         playback_stream = None
 
         try:
@@ -462,6 +470,8 @@ class AudioHandler:
                 output=True,
                 frames_per_buffer=self.config.chunk_size,
             )
+            # Expose the active stream for external stop
+            self.playback_stream = playback_stream
 
             # Play audio in chunks
             chunk_size = self.config.chunk_size * 2  # 2 bytes per sample
@@ -486,6 +496,8 @@ class AudioHandler:
                     playback_stream.close()
                 except Exception as e:
                     logging.error(f"Error closing playback stream: {e}")
+            # Clear the reference so is_playing reflects accurate state
+            self.playback_stream = None
 
             # Reset state
             with self.state_lock:
@@ -496,9 +508,15 @@ class AudioHandler:
         """Public method to stop any ongoing playback immediately."""
         try:
             self.stop_playback_event.set()
+            # Proactively stop the active stream to unblock writes
+            try:
+                if self.playback_stream is not None:
+                    self.playback_stream.stop_stream()
+            except Exception:
+                pass
             # Wait briefly for playback thread to exit
             if self.playback_thread and self.playback_thread.is_alive():
-                self.playback_thread.join(timeout=1.0)
+                self.playback_thread.join(timeout=2.0)
         finally:
             with self.state_lock:
                 if self.state == DeviceState.PLAYING:
@@ -567,6 +585,12 @@ class AudioHandler:
                     logging.debug("Button pressed")
                     if self.button_callback:
                         self.button_callback("button_press")
+                    # Stop any active playback and start recording
+                    try:
+                        if self.is_playing():
+                            self.stop_playback()
+                    except Exception:
+                        pass
                     self.start_recording()
                 else:
                     logging.debug("Button released")

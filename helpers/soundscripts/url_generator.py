@@ -6,6 +6,7 @@ import os
 import logging
 from typing import Dict, List
 from config import get_url_mapping
+from urllib.parse import quote
 
 
 class URLGenerator:
@@ -16,30 +17,31 @@ class URLGenerator:
         self.url_mapping = get_url_mapping()
         self.logger = logging.getLogger(__name__)
 
-    def generate_google_cloud_url(self, filename: str, source_dir: str) -> str:
+    def generate_google_cloud_url(
+        self, filename: str, source_dir: str, file_path: str = ""
+    ) -> str:
         """Generate Google Cloud Storage URL for audio file."""
-
-        # Map source directory to URL pattern
-        url_pattern = self._get_url_pattern_for_directory(source_dir)
-
-        # Generate URL
-        url = url_pattern.format(filename=filename)
+        # Build relative path after public/sounds/
+        rel = filename
+        if file_path:
+            p = file_path.replace("\\", "/")
+            anchor = "/public/sounds/"
+            idx = p.lower().find(anchor)
+            if idx != -1:
+                rel = p[idx + len(anchor) :]
+        url_pattern = self.url_mapping.get(
+            "cwsounds_prefix", "https://storage.googleapis.com/cwsounds/{relpath}"
+        )
+        url = url_pattern.format(relpath=quote(rel, safe="/"))
 
         self.logger.debug(f"Generated URL for {filename}: {url}")
         return url
 
     def _get_url_pattern_for_directory(self, source_dir: str) -> str:
-        """Get URL pattern based on source directory."""
-
-        # Normalize directory name for matching
-        dir_lower = source_dir.lower()
-
-        if "mixkit" in dir_lower:
-            return self.url_mapping["mixkit"]
-        elif "filmcow" in dir_lower:
-            return self.url_mapping["filmcow"]
-        else:
-            return self.url_mapping["google"]
+        """Deprecated: kept for compatibility; now unused."""
+        return self.url_mapping.get(
+            "cwsounds_prefix", "https://storage.googleapis.com/cwsounds/{relpath}"
+        )
 
     def validate_url(self, url: str) -> bool:
         """Validate URL format and structure."""
@@ -48,7 +50,7 @@ class URLGenerator:
             return False
 
         # Check if URL has required components
-        required_components = ["https://", "storage.googleapis.com", "cwsounds"]
+        required_components = ["https://", "storage.googleapis.com", "/cwsounds/"]
 
         for component in required_components:
             if component not in url:

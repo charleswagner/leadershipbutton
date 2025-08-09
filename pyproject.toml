@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "leadershipbutton"
+version = "0.1.0"
+description = "AI-powered leadership coach with voice input/output"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Leadership Button", email = "support@example.com" }]
+keywords = ["tts", "stt", "google-cloud", "ssml", "audio", "assistant"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+]
+# Core runtime deps (keep minimal; OS libs like PortAudio are system-provided)
+dependencies = [
+  "google-cloud-texttospeech>=2.16",
+  "google-cloud-speech>=2.24",
+  "google-generativeai>=0.6.0",
+  "python-dotenv>=1.0",
+  "pynput>=1.7",
+  "numpy>=1.24",
+  "sentence-transformers>=2.2; platform_system != 'Darwin' or python_version < '3.12'",
+  "rapidfuzz>=3.0",
+  "pyarrow>=13.0",
+]
+
+[project.urls]
+Homepage = "https://example.com/leadershipbutton"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[project.scripts]
+leadershipbutton = "leadership_button.runner:main"

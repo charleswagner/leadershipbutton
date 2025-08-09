@@ -8,27 +8,66 @@ consistency and makes it easy to update coaching approaches.
 
 from typing import Dict, List, Any
 import os
+from pathlib import Path
 
-PROMPTS_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-    "docs",
-    "specs",
-    "leadership_button",
-)
-STORY_PROMPT_PATH = os.path.join(PROMPTS_DIR, "story_prompt.md")
-ADVICE_PROMPT_PATH = os.path.join(PROMPTS_DIR, "advice_prompt.md")
-UNKNOWN_PROMPT_PATH = os.path.join(PROMPTS_DIR, "unknown_prompt.md")
+
+def _resolve_prompts_dir() -> str:
+    """Resolve the absolute path to the prompts directory robustly.
+
+    Order of resolution:
+    1) Environment variable overrides: LB_PROMPTS_DIR or PROMPTS_DIR
+    2) Walk up from this file's path to find 'docs/specs/leadership_button'
+    3) Current working directory + 'docs/specs/leadership_button'
+    4) Fallback: derive relative to this file assuming repo layout
+    """
+    # 1) Environment override
+    env_dir = os.getenv("LB_PROMPTS_DIR") or os.getenv("PROMPTS_DIR")
+    if env_dir:
+        candidate = Path(env_dir).expanduser().resolve()
+        if candidate.exists():
+            return str(candidate)
+
+    # 2) Walk up from this file to locate the docs/specs directory
+    this_file = Path(__file__).resolve()
+    for parent in [this_file.parent] + list(this_file.parents):
+        candidate = parent / "docs" / "specs" / "leadership_button"
+        if candidate.exists():
+            return str(candidate)
+
+    # 3) Try from current working directory
+    cwd_candidate = Path.cwd() / "docs" / "specs" / "leadership_button"
+    if cwd_candidate.exists():
+        return str(cwd_candidate.resolve())
+
+    # 4) Fallback to original relative approach
+    fallback = (
+        Path(__file__).resolve().parents[2] / "docs" / "specs" / "leadership_button"
+    )
+    return str(fallback)
+
+
+# Compute prompts directory and file paths using the resolver
+PROMPTS_DIR = _resolve_prompts_dir()
+STORY_PROMPT_PATH = str(Path(PROMPTS_DIR) / "story_prompt.md")
+ADVICE_PROMPT_PATH = str(Path(PROMPTS_DIR) / "advice_prompt.md")
+UNKNOWN_PROMPT_PATH = str(Path(PROMPTS_DIR) / "unknown_prompt.md")
 
 
 def _load_prompt_from_md(path: str) -> Dict[str, Any]:
     role = ""
     context = ""
     guidelines: List[str] = []
+    raw_text = ""
+    md_path = Path(path)
+    if not md_path.exists():
+        # Hard error per user instruction
+        raise FileNotFoundError(f"Prompt file not found: {md_path}")
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with md_path.open("r", encoding="utf-8") as f:
             section = None
             for raw in f:
                 line = raw.rstrip("\n")
+                raw_text += raw
                 if line.startswith("## "):
                     title = line[3:].strip().lower()
                     if "role" in title:
@@ -50,8 +89,21 @@ def _load_prompt_from_md(path: str) -> Dict[str, Any]:
         role = role.strip()
         context = context.strip()
     except Exception:
+        # swallow to allow caller to fallback behavior (but file existed)
         pass
-    return {"role": role, "context": context, "guidelines": guidelines}
+    return {"role": role, "context": context, "guidelines": guidelines, "raw": raw_text}
+
+
+def _format_duration(seconds: float) -> str:
+    try:
+        s = float(seconds)
+    except Exception:
+        return "?s"
+    if s < 90:
+        return f"{s:.1f}s"
+    m = int(s // 60)
+    r = int(s % 60)
+    return f"{m:d}:{r:02d}"
 
 
 class PromptsConfig:
@@ -165,20 +217,59 @@ User: {user_text}
         logging.info(f"📝 User Text: '{user_text}'")
         logging.info(f"🗂️ Context: {context}")
 
+        # Re-resolve PROMPTS_DIR at runtime in case environment changed
+        prompts_dir = Path(_resolve_prompts_dir())
+
         # Select prompt file based on intent.request
         intent = context.get("intent", {}) if isinstance(context, dict) else {}
         req = str(intent.get("request", "")).lower().strip()
         if req == "story":
-            path = STORY_PROMPT_PATH
+            chosen = prompts_dir / "story_prompt.md"
         elif req == "advice":
-            path = ADVICE_PROMPT_PATH
+            chosen = prompts_dir / "advice_prompt.md"
         else:
-            path = UNKNOWN_PROMPT_PATH
+            # Prefer unknown_prompt, fallback to unkown_prompt typo if needed
+            unknown_path = prompts_dir / "unknown_prompt.md"
+            if not unknown_path.exists():
+                typo_path = prompts_dir / "unkown_prompt.md"
+                chosen = typo_path if typo_path.exists() else unknown_path
+            else:
+                chosen = unknown_path
 
-        md = _load_prompt_from_md(path)
-        role = md.get("role") or cls.DEFAULTS["role"]
-        session_context = md.get("context") or cls.DEFAULTS["context"]
-        guidelines = md.get("guidelines") or cls.DEFAULTS["guidelines"]
+        logging.info(f"📄 Using prompt file: {chosen}")
+        md = _load_prompt_from_md(str(chosen))  # will raise if missing
+
+        role = md.get("role") or ""
+        session_context = md.get("context") or ""
+        guidelines = md.get("guidelines") or []
+        raw_text = md.get("raw", "")
+
+        # If structured sections weren't present, use entire raw file content as context
+        if not role and not session_context and raw_text:
+            logging.info(
+                "📄 Prompt has no Role/Context sections; using raw file content as context"
+            )
+            session_context = raw_text
+
+        # For known prompts (advice/story), do NOT inject generic defaults
+        if req in {"advice", "story"}:
+            if (not role) and (not session_context):
+                # File existed but no usable content
+                raise ValueError(
+                    f"Prompt file '{chosen.name}' contained no parseable content"
+                )
+            # If guidelines missing entirely, keep empty list; the template will still render
+            logging.info(
+                "🛡️ Defaults suppressed for %s prompt (using file content only)", req
+            )
+        else:
+            # Unknown request: allow conservative defaults
+            if not role:
+                role = cls.DEFAULTS["role"]
+            if not session_context:
+                session_context = cls.DEFAULTS["context"]
+            if not guidelines:
+                guidelines = cls.DEFAULTS["guidelines"]
 
         logging.info(f"🎭 Role Length: {len(role)} characters")
         logging.info(f"📋 Context Length: {len(session_context)} characters")
@@ -235,10 +326,27 @@ User: {user_text}
             if sounds:
                 lines = []
                 for s in sounds[:10]:
-                    title = s.get("display_title", "")
-                    tag = (s.get("tags", "").split(",")[0] or "").strip()
-                    lines.append(f"- {title} ({tag})" if tag else f"- {title}")
-                sounds_block = "\nAvailable Sounds:\n" + "\n".join(lines)
+                    title = s.get("display_title", "") or s.get("filename", "")
+                    s_type = (s.get("type", "") or "").lower()
+                    dur = _format_duration(s.get("duration", 0))
+                    cat = s.get("category", "")
+                    tags = s.get("tags", "")
+                    url = s.get("url") or s.get("url_token") or ""
+                    meta = []
+                    if s_type:
+                        meta.append(f"type={s_type}")
+                    if dur:
+                        meta.append(f"dur={dur}")
+                    if cat:
+                        meta.append(f"cat={cat}")
+                    if tags:
+                        meta.append(f"tags={tags}")
+                    if url:
+                        meta.append(f"url={url}")
+                    lines.append(f"- {title} | " + ", ".join(meta))
+                sounds_block = (
+                    "\nAvailable Sounds & Music (with metadata):\n" + "\n".join(lines)
+                )
 
             final_prompt = cls.PROMPT_TEMPLATES["leadership_coaching"][
                 "with_history_template"
@@ -271,10 +379,27 @@ User: {user_text}
             if sounds:
                 lines = []
                 for s in sounds[:10]:
-                    title = s.get("display_title", "")
-                    tag = (s.get("tags", "").split(",")[0] or "").strip()
-                    lines.append(f"- {title} ({tag})" if tag else f"- {title}")
-                sounds_block = "\nAvailable Sounds:\n" + "\n".join(lines)
+                    title = s.get("display_title", "") or s.get("filename", "")
+                    s_type = (s.get("type", "") or "").lower()
+                    dur = _format_duration(s.get("duration", 0))
+                    cat = s.get("category", "")
+                    tags = s.get("tags", "")
+                    url = s.get("url") or s.get("url_token") or ""
+                    meta = []
+                    if s_type:
+                        meta.append(f"type={s_type}")
+                    if dur:
+                        meta.append(f"dur={dur}")
+                    if cat:
+                        meta.append(f"cat={cat}")
+                    if tags:
+                        meta.append(f"tags={tags}")
+                    if url:
+                        meta.append(f"url={url}")
+                    lines.append(f"- {title} | " + ", ".join(meta))
+                sounds_block = (
+                    "\nAvailable Sounds & Music (with metadata):\n" + "\n".join(lines)
+                )
 
             final_prompt = cls.PROMPT_TEMPLATES["leadership_coaching"][
                 "base_template"

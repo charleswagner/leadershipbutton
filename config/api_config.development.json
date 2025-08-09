@@ -11,7 +11,7 @@
   },
   "text_to_speech": {
     "language_code": "en-US",
-    "voice_name": "en-US-Wavenet-F",
+    "voice_name": "en-US-Neural2-H",
     "audio_encoding": "LINEAR16",
     "speaking_rate": 1.0,
     "pitch": 0.0,

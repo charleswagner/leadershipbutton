@@ -274,8 +274,8 @@ class AudioAnalyzer:
         return features
 
     def get_supported_formats(self) -> List[str]:
-        """Get list of supported audio formats."""
-        return [".mp3", ".wav", ".ogg", ".flac", ".m4a", ".aac"]
+        """Get list of supported audio formats (WAV removed)."""
+        return [".mp3", ".ogg", ".flac", ".m4a", ".aac"]
 
     def validate_audio_file(self, file_path: str) -> bool:
         """Validate if file is a supported audio format."""

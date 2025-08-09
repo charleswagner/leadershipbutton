@@ -14,7 +14,9 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from pynput import keyboard
+# Do NOT import pynput at module import time (headless Pi may lack X)
+_pynput_keyboard = None  # set when available at runtime
+HAS_PYNPUT = False
 
 # Assuming these modules exist and are structured as per the specs
 # These will be placeholder imports if the actual files don't exist yet
@@ -60,7 +62,8 @@ class MainLoop:
 
         # New: Event for spacebar state, more thread-safe
         self.spacebar_pressed_event = threading.Event()
-        self.keyboard_listener: Optional[keyboard.Listener] = None
+        self.keyboard_listener: Optional[Any] = None
+        self._keyboard_backend: str = "none"
 
         self.audio_handler: Optional[AudioHandler] = None
         self.api_client: Optional[APIManager] = None
@@ -177,19 +180,21 @@ class MainLoop:
 
         self._initialize_components()
 
-        # Set up and start the keyboard listener
-        self.keyboard_listener = keyboard.Listener(
-            on_press=self.on_press, on_release=self.on_release
-        )
-        self.keyboard_listener.start()
+        # Set up and start the keyboard listener (headless-safe)
+        self._setup_keyboard_listener()
 
         print("🎤 HOLD THE SPACEBAR TO RECORD")
         print("Press Ctrl+C to exit.")
 
-        # The listener runs in a separate thread, so we can wait for it to stop.
-        # The main thread will block here until self.keyboard_listener.stop()
-        # is called.
-        self.keyboard_listener.join()
+        # Block the main thread appropriately so the service stays alive
+        if self._keyboard_backend == "pynput" and self.keyboard_listener:
+            self.keyboard_listener.join()
+        else:
+            try:
+                while self.running:
+                    time.sleep(0.2)
+            except KeyboardInterrupt:
+                pass
 
     def stop(self) -> None:
         """Stop the application and cleanup resources."""
@@ -216,33 +221,132 @@ class MainLoop:
         except Exception as e:
             self.logger.error(f"Error during cleanup: {e}")
 
+    def _setup_keyboard_listener(self) -> None:
+        """Initialize a keyboard listener that works on headless Pi.
+
+        Priority:
+        - Use pynput when available and DISPLAY is set
+        - Else, use evdev to listen for Enter/Space key events from /dev/input.
+        - As a last resort, run without a listener.
+        """
+        import os
+
+        # Try pynput only if DISPLAY is present
+        if os.environ.get("DISPLAY"):
+            try:
+                global _pynput_keyboard, HAS_PYNPUT
+                from pynput import keyboard as _kb
+
+                _pynput_keyboard = _kb
+                HAS_PYNPUT = True
+                self._keyboard_backend = "pynput"
+                self.keyboard_listener = _pynput_keyboard.Listener(
+                    on_press=self.on_press, on_release=self.on_release
+                )
+                self.keyboard_listener.start()
+                self.logger.info("Keyboard listener started with pynput backend")
+                return
+            except Exception as exc:
+                self.logger.warning(f"pynput backend unavailable: {exc}")
+
+        # Fallback: evdev on Linux without X
+        try:
+            import threading as _threading
+            from evdev import InputDevice, categorize, ecodes, list_devices
+
+            devices = [InputDevice(path) for path in list_devices()]
+            keyboard_devs = [
+                d for d in devices if "keyboard" in (d.name or "").lower() or d.phys
+            ]
+            if not keyboard_devs and devices:
+                keyboard_devs = devices  # try all if we cannot detect
+
+            def _reader(dev: InputDevice):
+                try:
+                    self.logger.info(f"evdev listening on {dev.path} ({dev.name})")
+                    for event in dev.read_loop():
+                        if event.type == ecodes.EV_KEY:
+                            data = categorize(event)
+                            code = getattr(data, "keycode", None)
+                            keys = code if isinstance(code, list) else [code]
+                            for k in keys:
+                                if k in (
+                                    "KEY_SPACE",
+                                    "KEY_ENTER",
+                                    "KEY_KPENTER",
+                                    "KEY_RETURN",
+                                ):
+                                    if data.keystate == 1:  # key down
+                                        self.logger.debug(f"evdev key down: {k}")
+                                        self.on_press("EVDEV_SPACE_ENTER")
+                                    elif data.keystate == 0:  # key up
+                                        self.logger.debug(f"evdev key up: {k}")
+                                        self.on_release("EVDEV_SPACE_ENTER")
+                except Exception as _exc:
+                    self.logger.warning(f"evdev reader error on {dev.path}: {_exc}")
+
+            # Spawn a reader thread per device so we don't block on the first one
+            for dev in keyboard_devs:
+                t = _threading.Thread(target=_reader, args=(dev,), daemon=True)
+                t.start()
+
+            self.keyboard_listener = None  # threads are daemonized
+            self._keyboard_backend = "evdev"
+            self.logger.info("Keyboard listener started with evdev backend")
+            return
+        except Exception as exc:
+            self.logger.warning(f"evdev backend unavailable: {exc}")
+
+        self._keyboard_backend = "none"
+        self.logger.warning("No keyboard backend available; running without hotkey")
+
     def on_press(self, key):
         """Callback for key press events."""
-        if key == keyboard.Key.space:
-            # Check if the event is already set to avoid re-triggering
+        is_space_or_enter = False
+        if (
+            HAS_PYNPUT
+            and _pynput_keyboard
+            and isinstance(key, getattr(_pynput_keyboard, "Key", object))
+        ):
+            is_space_or_enter = key in (
+                _pynput_keyboard.Key.space,
+                _pynput_keyboard.Key.enter,
+            )
+        else:
+            is_space_or_enter = key == "EVDEV_SPACE_ENTER"
+
+        if is_space_or_enter:
             if not self.spacebar_pressed_event.is_set():
                 self.spacebar_pressed_event.set()
+                try:
+                    if self.playback_manager:
+                        self.playback_manager.stop_playback()
+                        self.logger.info(
+                            "⏹️ Immediate playback stop requested on spacebar press"
+                        )
+                except Exception:
+                    pass
                 if self.current_state == ApplicationState.IDLE:
                     self._handle_spacebar_press()
                 elif self.current_state == ApplicationState.SPEAKING:
-                    # Interrupt playback and start a new recording immediately
-                    try:
-                        if (
-                            self.playback_manager
-                            and self.playback_manager.audio_handler
-                        ):
-                            self.playback_manager.audio_handler.stop_playback()
-                            self.logger.info("⏹️ Playback interrupted by user")
-                    except Exception as exc:
-                        self.logger.warning(f"Failed to stop playback: {exc}")
-                    # Transition to recording
                     self._transition_state(ApplicationState.IDLE)
                     self._handle_spacebar_press()
 
     def on_release(self, key):
         """Callback for key release events."""
-        if key == keyboard.Key.space:
-            # Check if the event was set to avoid false releases
+        if (
+            HAS_PYNPUT
+            and _pynput_keyboard
+            and isinstance(key, getattr(_pynput_keyboard, "Key", object))
+        ):
+            is_space_or_enter = key in (
+                _pynput_keyboard.Key.space,
+                _pynput_keyboard.Key.enter,
+            )
+        else:
+            is_space_or_enter = key == "EVDEV_SPACE_ENTER"
+
+        if is_space_or_enter:
             if self.spacebar_pressed_event.is_set():
                 self.spacebar_pressed_event.clear()
                 if self.current_state == ApplicationState.RECORDING:
@@ -339,7 +443,9 @@ class MainLoop:
             self._transition_state(ApplicationState.SPEAKING)
             # Pass the full response object to preserve AudioData sample rate info
             # DO NOT extract .data - that loses the sample rate information!
-            self.playback_manager.play_audio_and_wait(response, "api_response")
+            self.playback_manager.play_audio_and_wait(
+                response, "api_response", stop_event=self.spacebar_pressed_event
+            )
             self._handle_audio_complete()
         except Exception as e:
             self._handle_error(e)

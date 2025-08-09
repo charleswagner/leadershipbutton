@@ -1,0 +1,12 @@
+{
+  "input": {
+    "ssml": "<speak><backgroundaudio src='https://actions.google.com/sounds/v1/ambiences/factory_background.ogg' />I am speaking over a background track of factory sounds. This is pretty cool!</speak>"
+  },
+  "voice": {
+    "languageCode": "en-US",
+    "name": "en-US-Wavenet-D"
+  },
+  "audioConfig": {
+    "audioEncoding": "MP3"
+  }
+}

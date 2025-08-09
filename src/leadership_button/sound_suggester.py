@@ -81,6 +81,8 @@ STOPWORDS = {
     "be",
 }
 
+ALLOWED_AUDIO_EXTENSIONS = {".mp3", ".ogg"}
+
 
 def _safe_lower(s: Any) -> str:
     return str(s).lower() if s is not None else ""
@@ -309,6 +311,14 @@ class SoundSuggester:
         tset = set(terms)
         cands: List[Tuple[float, Dict[str, Any]]] = []
         for r in rows:
+            # Enforce allowed audio extensions (exclude WAV and others)
+            fn_raw = r.get("filename", "") or ""
+            fp_raw = r.get("file_path", "") or ""
+            fn_lower = _safe_lower(fn_raw)
+            fp_lower = _safe_lower(fp_raw)
+            ext = os.path.splitext(fn_lower)[1] or os.path.splitext(fp_lower)[1]
+            if ext and ext.lower() not in ALLOWED_AUDIO_EXTENSIONS:
+                continue
             fn = _safe_lower(r.get("filename", ""))
             title = _safe_lower(r.get("kit_title", ""))
             tags = _safe_lower(r.get("kit_tags", ""))
@@ -325,8 +335,7 @@ class SoundSuggester:
                 dur = float(r.get("duration", 0) or 0)
             except Exception:
                 dur = 0.0
-            a_type = _safe_lower(r.get("audio_type", ""))
-            is_music = a_type == "song"
+            is_music = self._is_mixkit_source(r)
             if is_music and not (8.0 <= dur <= 90.0):
                 continue
             if (not is_music) and not (0.2 <= dur <= 10.0):
@@ -384,13 +393,11 @@ class SoundSuggester:
                 | ({cat} if cat else set())
             )
             overlap = len(item_terms & tset)
-            # duration fit
             try:
                 dur = float(r.get("duration", 0) or 0)
             except Exception:
                 dur = 0.0
-            a_type = _safe_lower(r.get("audio_type", ""))
-            is_music = a_type == "song"
+            is_music = self._is_mixkit_source(r)
             dur_fit = self._duration_fit(dur, is_music)
             tone_fit = 0.5 if cat in ("ambient", "kids", "calm", "lullaby") else 0.0
             base_score = (
@@ -448,12 +455,20 @@ class SoundSuggester:
         target_sfx: int,
         limit: int,
     ) -> List[Dict[str, Any]]:
-        # Split by type
-        music = [t for t in ranked if _safe_lower(t[1].get("audio_type", "")) == "song"]
-        sfx = [t for t in ranked if _safe_lower(t[1].get("audio_type", "")) != "song"]
+        # Split by source: Mixkit -> music; else -> sfx
+        music = [t for t in ranked if self._is_mixkit_source(t[1])]
+        sfx = [t for t in ranked if not self._is_mixkit_source(t[1])]
 
         picks: List[Dict[str, Any]] = []
-        picks = self._mmr_pick(music, target_music) + self._mmr_pick(sfx, target_sfx)
+        # If caller requests larger lists, scale targets but keep both sources represented
+        total = max(limit, target_music + target_sfx)
+        # Ensure at least 1/3 music and 1/3 sfx when possible
+        min_music = max(1, total // 3)
+        min_sfx = max(1, total // 3)
+        # Start with balanced picks
+        picks = self._mmr_pick(music, max(min_music, target_music)) + self._mmr_pick(
+            sfx, max(min_sfx, target_sfx)
+        )
         if len(picks) < limit:
             # fill remainder by highest remaining
             remaining = [r for r in ranked if r[1] not in picks]
@@ -462,30 +477,32 @@ class SoundSuggester:
 
         # Shape output
         out: List[Dict[str, Any]] = []
+        from urllib.parse import quote
+
         for r in picks[:limit]:
-            # Ensure a cloud URL is present; fall back to cwsounds bucket if missing
-            url = r.get("google_cloud_url", "") or ""
-            if not url:
-                fn = r.get("filename", "")
-                folder = "google"
-                fn_l = _safe_lower(fn)
-                if "mixkit" in fn_l:
-                    folder = "mixkit"
-                elif "filmcow" in fn_l:
-                    folder = "filmcow"
-                url = f"https://storage.googleapis.com/cwsounds/{folder}/{fn}"
+            # Guard again on extension in case upstream call sites bypass _prefilter
+            fn_lower = _safe_lower(r.get("filename", ""))
+            fp_lower = _safe_lower(r.get("file_path", ""))
+            ext = os.path.splitext(fn_lower)[1] or os.path.splitext(fp_lower)[1]
+            if ext and ext.lower() not in ALLOWED_AUDIO_EXTENSIONS:
+                continue
+            # Always derive URL from original file_path to avoid stale CSV urls
+            fp = (r.get("file_path", "") or "").replace("\\", "/")
+            rel = r.get("filename", "")
+            anchor = "/public/sounds/"
+            idx = fp.lower().find(anchor)
+            if idx != -1:
+                rel = fp[idx + len(anchor) :]
+            url = f"https://storage.googleapis.com/cwsounds/{quote(rel, safe='/')}"
             out.append(
                 {
                     "filename": r.get("filename", ""),
                     "display_title": r.get("kit_title", "")
                     or os.path.splitext(r.get("filename", ""))[0],
-                    "type": (
-                        "music"
-                        if _safe_lower(r.get("audio_type", "")) == "song"
-                        else "sfx"
-                    ),
+                    "type": ("music" if self._is_mixkit_source(r) else "sfx"),
                     "tags": r.get("kit_tags", ""),
                     "duration": float(r.get("duration", 0) or 0.0),
+                    # Include the full URL so the LLM can embed it directly in SSML
                     "url": url,
                     "category": r.get("kit_category", ""),
                 }
@@ -533,3 +550,14 @@ class SoundSuggester:
             else 0.0
         )
         return 0.6 * _jaccard(a_terms, b_terms) + 0.4 * cat_sim
+
+    def _is_mixkit_source(self, row: Dict[str, Any]) -> bool:
+        """Return True if the audio comes from Mixkit (used to label as music)."""
+        # Prefer explicit source_directory
+        src = _safe_lower(row.get("source_directory", ""))
+        if "mixkit" in src:
+            return True
+        # Fallback to file_path or filename heuristics
+        fp = _safe_lower(row.get("file_path", ""))
+        fn = _safe_lower(row.get("filename", ""))
+        return ("/mixkit/" in fp) or ("mixkit" in fn)

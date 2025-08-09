@@ -37,9 +37,9 @@ SUPPORTED_FORMATS = [".mp3", ".wav", ".ogg", ".flac", ".m4a", ".aac"]
 
 # URL mapping for Google Cloud Storage
 URL_MAPPING = {
-    "google": "https://storage.googleapis.com/cwsounds/google/{filename}",
-    "mixkit": "https://storage.googleapis.com/cwsounds/mixkit/{filename}",
-    "filmcow": "https://storage.googleapis.com/cwsounds/filmcow/{filename}",
+    # Use single bucket/prefix; we inject the relative path after public/sounds/
+    # Example: https://storage.googleapis.com/cwsounds/FilmCow%20Recorded%20SFX/knife%20pull%20out%202.wav
+    "cwsounds_prefix": "https://storage.googleapis.com/cwsounds/{relpath}",
 }
 
 # CSV headers

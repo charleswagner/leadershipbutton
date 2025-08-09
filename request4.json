@@ -1,0 +1,12 @@
+{
+  "input": {
+    "ssml": "<speak>PASTE THE CONTENT OF your request3.ssml FILE HERE</speak>"
+  },
+  "voice": {
+    "languageCode": "en-US",
+    "name": "en-US-Wavenet-D"
+  },
+  "audioConfig": {
+    "audioEncoding": "MP3"
+  }
+}
