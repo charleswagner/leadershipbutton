@@ -8,6 +8,7 @@ a robust state machine for handling user interactions.
 
 import json
 import os
+import platform
 import logging
 import threading
 import time
@@ -237,10 +238,9 @@ class MainLoop:
         - Else, use evdev to listen for Enter/Space key events from /dev/input.
         - As a last resort, run without a listener.
         """
-        import os
-
-        # Try pynput only if DISPLAY is present
-        if os.environ.get("DISPLAY"):
+        # Try pynput on non-Linux platforms unconditionally, or on Linux when DISPLAY is present
+        allow_pynput = platform.system() != "Linux" or os.environ.get("DISPLAY")
+        if allow_pynput:
             try:
                 global _pynput_keyboard, HAS_PYNPUT
                 from pynput import keyboard as _kb
