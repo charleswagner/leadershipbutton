@@ -230,12 +230,24 @@ User: {user_text}
             logging.info(f"📜 History Length: {len(history_text)} characters")
             logging.info(f"📊 History Exchanges: {len(history)} total, using last 2")
 
+            sounds_block = ""
+            sounds = context.get("sound_suggestions", [])
+            if sounds:
+                lines = []
+                for s in sounds[:10]:
+                    title = s.get("display_title", "")
+                    tag = (s.get("tags", "").split(",")[0] or "").strip()
+                    lines.append(f"- {title} ({tag})" if tag else f"- {title}")
+                sounds_block = "\nAvailable Sounds:\n" + "\n".join(lines)
+
             final_prompt = cls.PROMPT_TEMPLATES["leadership_coaching"][
                 "with_history_template"
             ].format(
                 role=role,
                 context=(
-                    session_context + ("\n\n" + intent_block if intent_block else "")
+                    session_context
+                    + ("\n\n" + intent_block if intent_block else "")
+                    + (sounds_block if sounds_block else "")
                 ),
                 conversation_history=history_text.strip(),
                 user_text=user_text,
@@ -254,12 +266,24 @@ User: {user_text}
         else:
             logging.info("📚 Using BASE template (no history)")
 
+            sounds_block = ""
+            sounds = context.get("sound_suggestions", [])
+            if sounds:
+                lines = []
+                for s in sounds[:10]:
+                    title = s.get("display_title", "")
+                    tag = (s.get("tags", "").split(",")[0] or "").strip()
+                    lines.append(f"- {title} ({tag})" if tag else f"- {title}")
+                sounds_block = "\nAvailable Sounds:\n" + "\n".join(lines)
+
             final_prompt = cls.PROMPT_TEMPLATES["leadership_coaching"][
                 "base_template"
             ].format(
                 role=role,
                 context=(
-                    session_context + ("\n\n" + intent_block if intent_block else "")
+                    session_context
+                    + ("\n\n" + intent_block if intent_block else "")
+                    + (sounds_block if sounds_block else "")
                 ),
                 user_text=user_text,
                 response_instructions=response_instructions,

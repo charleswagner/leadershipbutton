@@ -21,6 +21,7 @@ from tenacity import (
 from .api_client import AIProvider
 from .prompts_config import PromptsConfig
 from .intent_analyzer import IntentAnalyzer
+from .sound_suggester import SoundSuggester
 
 # Gemini AI dependencies
 try:
@@ -93,9 +94,14 @@ class GeminiFlashProvider(AIProvider):
         # Intent analyzer
         try:
             self.intent_analyzer = IntentAnalyzer(model=self.model_name)
+            self.suggester = SoundSuggester()
         except Exception as exc:
             logging.warning("Intent analyzer unavailable: %s", exc)
             self.intent_analyzer = None
+            try:
+                self.suggester = SoundSuggester()
+            except Exception:
+                self.suggester = None
 
         # Safety settings for leadership coaching context
         self.safety_settings = {
@@ -160,9 +166,19 @@ class GeminiFlashProvider(AIProvider):
                 )
             except Exception:
                 logging.info("🧭 Intent Analysis (provider): %s", intent)
+            # Generate sound suggestions and inject
+            try:
+                if self.suggester:
+                    suggestions = self.suggester.suggest(intent, limit=20)
+                    context["sound_suggestions"] = suggestions
+                    logging.info(
+                        "🎹 Top sound suggestions (count=%d)", len(suggestions)
+                    )
+            except Exception as exc:
+                logging.warning("Sound suggestions failed: %s", exc)
         prompt = PromptsConfig.get_leadership_prompt(text, context)
 
-        # 🔍 LOG GENERATED PROMPT DETAILS
+        # �� LOG GENERATED PROMPT DETAILS
         logging.info("✅ PROMPT GENERATED SUCCESSFULLY:")
         logging.info(f"📏 FINAL PROMPT LENGTH: {len(prompt)} characters")
         logging.info(f"🎯 PROMPT PREVIEW: '{prompt[:200]}...'")
