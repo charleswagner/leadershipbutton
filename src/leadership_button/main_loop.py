@@ -19,7 +19,7 @@ from pynput import keyboard
 # Assuming these modules exist and are structured as per the specs
 # These will be placeholder imports if the actual files don't exist yet
 from .api_client import APIManager, APIConfig
-from .audio_handler import AudioHandler
+from .audio_handler import AudioHandler, AudioConfig
 from .audio_playback import AudioPlaybackManager
 
 
@@ -94,9 +94,8 @@ class MainLoop:
             self.logger.info("API client initialized")
 
             # Initialize audio handler for microphone recording
-            from .audio_handler import AudioHandler
-
-            self.audio_handler = AudioHandler(config.config_data)
+            audio_config = AudioConfig(config.config_data)
+            self.audio_handler = AudioHandler(audio_config)
             self.logger.info("Audio handler initialized for microphone recording")
 
             # Initialize audio playback manager with centralized config
