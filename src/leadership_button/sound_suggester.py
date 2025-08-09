@@ -463,6 +463,17 @@ class SoundSuggester:
         # Shape output
         out: List[Dict[str, Any]] = []
         for r in picks[:limit]:
+            # Ensure a cloud URL is present; fall back to cwsounds bucket if missing
+            url = r.get("google_cloud_url", "") or ""
+            if not url:
+                fn = r.get("filename", "")
+                folder = "google"
+                fn_l = _safe_lower(fn)
+                if "mixkit" in fn_l:
+                    folder = "mixkit"
+                elif "filmcow" in fn_l:
+                    folder = "filmcow"
+                url = f"https://storage.googleapis.com/cwsounds/{folder}/{fn}"
             out.append(
                 {
                     "filename": r.get("filename", ""),
@@ -475,7 +486,7 @@ class SoundSuggester:
                     ),
                     "tags": r.get("kit_tags", ""),
                     "duration": float(r.get("duration", 0) or 0.0),
-                    "url": r.get("google_cloud_url", ""),
+                    "url": url,
                     "category": r.get("kit_category", ""),
                 }
             )

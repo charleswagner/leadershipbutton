@@ -174,6 +174,14 @@ class GeminiFlashProvider(AIProvider):
                     logging.info(
                         "🎹 Top sound suggestions (count=%d)", len(suggestions)
                     )
+                    for s in suggestions:
+                        logging.info(
+                            "   🎵 %s | %s | %s | tags: %s",
+                            s.get("filename", ""),
+                            s.get("display_title", ""),
+                            s.get("url", ""),
+                            (s.get("tags", "").split(",")[0] or "").strip(),
+                        )
             except Exception as exc:
                 logging.warning("Sound suggestions failed: %s", exc)
         prompt = PromptsConfig.get_leadership_prompt(text, context)
