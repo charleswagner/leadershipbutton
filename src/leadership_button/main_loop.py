@@ -7,12 +7,14 @@ a robust state machine for handling user interactions.
 """
 
 import json
+import os
 import logging
 import threading
 import time
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from datetime import datetime, timezone
 
 # Do NOT import pynput at module import time (headless Pi may lack X)
 _pynput_keyboard = None  # set when available at runtime
@@ -71,6 +73,12 @@ class MainLoop:
 
         self.start_time = 0.0
         self.response_times: List[float] = []
+        # Commands log setup
+        self._commands_log_dir = Path(os.getenv("LB_LOG_DIR", "logs")) / "commands"
+        try:
+            self._commands_log_dir.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
 
         # Initialize all components
         self._initialize_components()
@@ -316,6 +324,7 @@ class MainLoop:
             is_space_or_enter = key == "EVDEV_SPACE_ENTER"
 
         if is_space_or_enter:
+            self._log_command("button_press", {"backend": self._keyboard_backend})
             if not self.spacebar_pressed_event.is_set():
                 self.spacebar_pressed_event.set()
                 try:
@@ -349,6 +358,7 @@ class MainLoop:
         if is_space_or_enter:
             if self.spacebar_pressed_event.is_set():
                 self.spacebar_pressed_event.clear()
+                self._log_command("button_release", {"backend": self._keyboard_backend})
                 if self.current_state == ApplicationState.RECORDING:
                     self._handle_spacebar_release()
 
@@ -365,8 +375,17 @@ class MainLoop:
 
         try:
             self._transition_state(ApplicationState.RECORDING)
+            self._log_command("recording_start_requested", {})
             self.audio_handler.start_recording()
             self.logger.info("Recording started")
+            self._log_command(
+                "recording_started",
+                {
+                    "sample_rate": getattr(self.audio_handler.config, "sample_rate", None),
+                    "channels": getattr(self.audio_handler.config, "channels", None),
+                    "device_index": getattr(self.audio_handler.config, "device_index", None),
+                },
+            )
         except Exception as e:
             self._handle_error(e)
 
@@ -385,14 +404,25 @@ class MainLoop:
 
         try:
             self._transition_state(ApplicationState.PROCESSING)
+            self._log_command("recording_stop_requested", {})
             # The test will mock _handle_recording_complete, so this call is fine.
             # The error is in the subsequent calls.
             audio_data = self.audio_handler.stop_recording()
             if audio_data and audio_data.data:
                 self.logger.info("Recording stopped successfully")
+                self._log_command(
+                    "recording_stopped",
+                    {
+                        "bytes": len(audio_data.data),
+                        "format": getattr(audio_data, "format", None),
+                        "sample_rate": getattr(audio_data, "sample_rate", None),
+                        "channels": getattr(audio_data, "channels", None),
+                    },
+                )
                 self._handle_recording_complete(audio_data.data)
             else:
                 self.logger.error("No audio data from recording, returning to idle.")
+                self._log_command("recording_stopped", {"bytes": 0})
                 self._transition_state(ApplicationState.IDLE)
         except Exception as e:
             self._handle_error(e)
@@ -488,6 +518,10 @@ class MainLoop:
 
             self.current_state = new_state
             self.logger.info(f"State transitioned from {old_state} to {new_state}")
+            self._log_command(
+                "state_transition",
+                {"from": old_state.value, "to": new_state.value},
+            )
 
     def _is_valid_transition(
         self, from_state: ApplicationState, to_state: ApplicationState
@@ -508,6 +542,24 @@ class MainLoop:
             ApplicationState.ERROR: [ApplicationState.IDLE],
         }
         return to_state in valid_transitions.get(from_state, [])
+
+    def _log_command(self, event: str, details: Dict[str, Any]) -> None:
+        """Append a single command log as JSONL into the commands log directory."""
+        try:
+            ts = datetime.now(timezone.utc).isoformat()
+            entry = {
+                "ts": ts,
+                "event": event,
+                "state": self.current_state.value,
+                "details": details or {},
+            }
+            log_file = self._commands_log_dir / (
+                f"recording_commands_{datetime.now().strftime('%Y-%m-%d')}.log"
+            )
+            with log_file.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        except Exception:
+            pass
 
     def get_state(self) -> ApplicationState:
         """Get current application state."""
