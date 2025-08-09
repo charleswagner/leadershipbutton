@@ -6,11 +6,14 @@ laptop development and Raspberry Pi production environments.
 """
 
 import logging
+import os
 import threading
 import time
 import wave
 from typing import Optional, Callable, Dict, Any
 from enum import Enum
+from pathlib import Path
+from datetime import datetime
 
 # Core audio dependencies
 try:
@@ -357,6 +360,17 @@ class AudioHandler:
                 sample_rate=self.config.sample_rate,
                 channels=self.config.channels,
             )
+
+            # Persist a copy of the raw recording for later review
+            try:
+                base = Path(os.environ.get("LB_LOG_DIR", "logs")) / "audio" / "recordings"
+                base.mkdir(parents=True, exist_ok=True)
+                ts = datetime.now().strftime("%Y%m%d-%H%M%S%f")
+                out_path = base / f"recording_{ts}.wav"
+                audio_data.save_to_file(str(out_path))
+                logging.info("💾 Saved recorded audio to %s", out_path)
+            except Exception as _exc:
+                logging.warning("Failed to save recorded audio: %s", _exc)
 
             with self.state_lock:
                 self.state = DeviceState.IDLE

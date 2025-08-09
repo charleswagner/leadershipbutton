@@ -602,6 +602,25 @@ class TTSClient:
             # Convert to AudioData
             audio_data = self._convert_api_audio_to_audiodata(response.audio_content)
 
+            # Persist generated audio for later review
+            try:
+                from pathlib import Path as _P
+                from datetime import datetime as _DT
+                import os as _os
+                base = _P(_os.environ.get("LB_LOG_DIR", "logs")) / "audio" / "generated"
+                base.mkdir(parents=True, exist_ok=True)
+                ts = _DT.now().strftime("%Y%m%d-%H%M%S%f")
+                out_path = base / f"tts_text_{ts}.wav"
+                try:
+                    # If AudioData available, save via helper
+                    audio_data.save_to_file(str(out_path))
+                except Exception:
+                    with open(out_path, "wb") as f:
+                        f.write(response.audio_content)
+                logging.info("💾 Saved generated TTS (text) to %s", out_path)
+            except Exception as _exc:
+                logging.warning("Failed to save generated TTS (text): %s", _exc)
+
             logging.info(
                 f"TTS synthesis completed: {len(text)} chars -> {len(audio_data.data)} bytes"
             )
@@ -728,6 +747,24 @@ class TTSClient:
                 input=synthesis_input, voice=voice, audio_config=audio_config
             )
             audio_data = self._convert_api_audio_to_audiodata(response.audio_content)
+
+            # Persist generated SSML audio for later review
+            try:
+                from pathlib import Path as _P
+                from datetime import datetime as _DT
+                import os as _os
+                base = _P(_os.environ.get("LB_LOG_DIR", "logs")) / "audio" / "generated"
+                base.mkdir(parents=True, exist_ok=True)
+                ts = _DT.now().strftime("%Y%m%d-%H%M%S%f")
+                out_path = base / f"tts_ssml_{ts}.wav"
+                try:
+                    audio_data.save_to_file(str(out_path))
+                except Exception:
+                    with open(out_path, "wb") as f:
+                        f.write(response.audio_content)
+                logging.info("💾 Saved generated TTS (ssml) to %s", out_path)
+            except Exception as _exc:
+                logging.warning("Failed to save generated TTS (ssml): %s", _exc)
             logging.info(
                 f"TTS SSML synthesis completed: {len(ssml)} chars -> {len(audio_data.data)} bytes"
             )
