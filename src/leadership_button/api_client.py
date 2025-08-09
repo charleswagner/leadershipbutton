@@ -658,7 +658,7 @@ class TTSClient:
             synthesis_input = texttospeech.SynthesisInput(ssml=ssml)
 
             # Log SSML preview and mode
-            logging.info("📝 SSML INPUT (preview full):", ssml)
+            logging.info("📝 SSML INPUT (preview full): %s", ssml)
             print("📝 SSML INPUT (preview full):", ssml)
 
             # Voice selection (same as in synthesize_text)
