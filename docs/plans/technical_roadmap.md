@@ -283,6 +283,78 @@ This document outlines the technical implementation plan for The Leadership Butt
 - [ ] Add hardware integration for dedicated solutions
 - [ ] Implement cross-platform compatibility
 
+## Next Feature: Sound & Music Suggestion Engine
+
+### Objective
+
+Rank and return the top 20 sound/music assets for a given user utterance using intent analysis and library metadata.
+
+### Inputs
+
+- Intent JSON: `{ request, tone, context, pieces[] }`
+- Audio Library: CSV with metadata + kit fields + analysis features (tempo, duration, spectral features, tags)
+
+### Components
+
+- `src/leadership_button/sound_suggester.py`
+  - `SoundSuggester.suggest(intent, limit=20)` -> List[Dict]
+  - Scoring model combining:
+    - Theme / tag overlap (context + pieces → tags)
+    - Tone alignment (gentle/upbeat/serious → category/tempo ranges)
+    - Age-appropriateness (whitelist categories + safe tags)
+    - Technical fit (duration window, sample rate compatibility)
+    - Diversity (dedupe categories; mix music + SFX)
+- Index Builder (optional): preload CSV to in-memory index for sub-300ms queries
+- Logger: dumps scored candidates and rationale
+
+### Scoring (initial heuristic)
+
+- Tag/keyword relevance: 0–0.5
+- Tone/mood match: 0–0.2
+- Duration fit (10–45s music, 0.3–5s SFX): 0–0.15
+- Diversity boost (category and source variety): 0–0.1
+- Safety and age filters (hard gates)
+
+### Output Schema
+
+```
+[
+  {
+    "filename": "string",
+    "display_title": "string",
+    "type": "music|sfx",
+    "tags": [""],
+    "duration": 12.3,
+    "score": 0.87,
+    "url": "https://...",
+  },
+  ... up to 20
+]
+```
+
+### Integration Points
+
+- Provider: after intent analysis, call `SoundSuggester.suggest()`; include top suggestions in context
+- Prompt: add a compact “Available Sounds” section (titles/tags only) or let Gemini pull as needed
+- Logging: log request, filters, top 20 with scores
+
+### Performance Targets
+
+- Warm index: < 200ms; cold start: < 800ms
+- Memory: < 50MB for typical libraries
+
+### Test Plan
+
+- Unit tests for scoring and filters
+- Fixture CSV with mixed music/SFX
+- Golden tests for deterministic ranking given frozen seed
+
+### Risks & Mitigations
+
+- Incomplete tags → use fuzzy matching on filenames and kit descriptions
+- Latency → pre-index and cache by (tone, top-n keywords)
+- Safety → maintain denylist/allowlist for tags/categories
+
 ## Technical Architecture Evolution
 
 ### Current Architecture ✅

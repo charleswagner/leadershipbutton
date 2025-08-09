@@ -220,3 +220,18 @@ The Leadership Button transforms leadership development through AI-powered voice
 - **User Engagement**: Increased user engagement through personalization
 - **Platform Support**: Successful deployment across multiple platforms
 - **Scalability**: System handles multiple concurrent users effectively
+
+## Next Feature: Sound & Music Suggestion Engine (for Stories/Advice)
+
+- **Goal**: Automatically recommend the best 20 sound effects and music tracks to enhance Lyra’s responses for an 8-year-old (story or advice).
+- **How it works**:
+  - Uses the new intent analysis (request, tone, context, pieces)
+  - Matches against our audio library metadata (Mixkit + analyzed features)
+  - Ranks candidates by theme relevance, age-appropriateness, mood/tone, tempo, and duration
+  - Returns a concise list of 20 suggestions (title, type, tags, URL/path)
+- **User Value**: Makes stories richer and advice more engaging by offering fun, kid-friendly sounds and music cues.
+- **Acceptance Criteria**:
+  - Returns up to 20 suggestions in < 300ms for typical libraries
+  - Each item includes: filename, display title, category, tags, duration, and URL
+  - Respects “tone” (e.g., gentle/dad_mode) and avoids unsuitable content
+  - Logged for transparency and troubleshooting
